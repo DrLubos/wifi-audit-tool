@@ -1,0 +1,14 @@
+.ignore/
+.vscode/
+
+build/
+venv/
+*.egg-info/
+__pycache__/
+
+kismet/
+logs/
+old/
+tests/data/
+
+aircrack.txt
