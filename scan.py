@@ -33,19 +33,19 @@ def init():
             var = line.split('=')[0]
             value = line.split('=')[1]
             if var == "IFACE":
-                monitoringInterface = value
+                monitoringInterface = value # SETUP[0]
             elif var == "SCAN_TYPE":
-                scanType = int(value)
+                scanType = int(value) # SETUP[1]
             elif var == "RECHECK":
-                mult = int(value.split('*')[0])
+                mult = int(value.split('*')[0]) #
                 secs = int(value.split('*')[1])
-                recheckTime = mult * secs
+                recheckTime = mult * secs # SETUP[2]
             elif var == "MAIN_SLEEP":
-                sleep = int(value)
+                sleep = int(value) # SETUP[3]
             elif var == "MAX_AP_DISTANCE":
-                max_dist = float(value)
+                max_dist = float(value) # SETUP[4]
             elif var == "IFACE2":
-                connect_interface = value
+                connect_interface = value # SETUP[5]
 
     setupParameters = (monitoringInterface, scanType, recheckTime, sleep, max_dist,connect_interface)
     return setupParameters
@@ -56,19 +56,23 @@ def monitoring_mode():
     global SETUP
     SETUP = init()
     monitoringInterface = SETUP[0]
-    # os.system("echo kali | sudo -S airmon-ng stop %s" % (monitoringInterface + "mon"));
-    # os.system("echo kali | sudo -S airmon-ng start %s" % (monitoringInterface))
-    return monitoringInterface + "mon"
+    monitoringInterface = monitoringInterface[:-1] # remove the last character "\n"
+    os.system("airmon-ng start %s" % (monitoringInterface))
+    monitoringInterface = monitoringInterface + "mon"
+    return monitoringInterface
 
 
 # spustenie kismet programu
 def kismet_run():
     monitoringInterface = monitoring_mode()
-    os.chdir(KISMET_DIR)
-    #os.system("kismet -c %s &" % (monitoringInterface))
-    #subprocess.Popen("kismet -c %s" % (monitoringInterface), shell=True)
-    os.chdir("..")
-    add_dummy_wep_device()
+    command = f"kismet -c {monitoringInterface} --daemonize "
+    subprocess.Popen(
+		command,
+		shell=True,
+		cwd=KISMET_DIR,
+		stdout=subprocess.DEVNULL,
+		stderr=subprocess.DEVNULL
+	)
 
 
 def add_dummy_wep_device():
@@ -185,7 +189,7 @@ def parse():
         countDevice += 1
 
         if device['kismet.device.base.type'] != 'Wi-Fi AP':
-            LOGGER.info("err: the device %s %s", device["kismet.device.base.commonname"], "is not an AP")
+            #LOGGER.info("err: the device %s %s", device["kismet.device.base.commonname"], "is not an AP") # This is just spam for long scans...
             continue
 
         def get_attribute(attr_name, device_name, d=device):
@@ -194,7 +198,8 @@ def parse():
 
             attr = d.get(attr_name, '')
             if attr == '':
-                LOGGER.warning('Attribute %s was not found for the device %s', attr_name, device_name)
+                #LOGGER.warning('Attribute %s was not found for the device %s', attr_name, device_name) # This is just spam for long scans...
+                return 
             return attr
 
         ssid = get_attribute('kismet.device.base.commonname', '')

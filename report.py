@@ -16,8 +16,12 @@ parser.add_argument('-device', type=str, metavar='D', help='Name of device for w
 parser.add_argument('--osm', action='store_true', help='Generate a report with openStreet Map instead of an Google Map.')
 args = parser.parse_args()
 
-if os.path.isdir('/var/www/html/test') == False:
-    os.mkdir('/var/www/html/test')
+current_date_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+reports_path = '/var/www/html/reports/maps'
+reports_path = reports_path + '/' + current_date_time
+
+if os.path.isdir(reports_path) == False:
+    os.mkdir(reports_path)
 
 # Connects to the database specified by the 'database_name' parameter in the kismet/ directory.
 def connect_to_database(database_name):
@@ -140,15 +144,12 @@ if __name__ == '__main__':
 
         data = ''
         if is_osm :
-            #generate_report = Visualization.newVorenieBody(device_ssid,pole[0][7])
-            #generate_report = Visualization.getDevices(database_name)
-            Visualization.getDevices(database_name,device_ssid)
+            Visualization.getDevices(reports_path, database_name, device_ssid)
             exit(0)
         elif is_csv:
             generate_report = generate_csv_report
         else:
             generate_report = generate_html_report
-        #generate_report = generate_csv_report if is_csv else generate_html_report
         for d in result:
             device_id = d[0]
 
@@ -165,6 +166,5 @@ if __name__ == '__main__':
             report_name = "%s_%s_%s.%s" % (database_name, device_ssid, now, extension)
         else:
             report_name = "%s_%s.%s" % (database_name, now, extension)
-        with open('reports/' + report_name, 'w', newline='') as report_file:
+        with open(reports_path + "/" + report_name, 'w', newline='') as report_file:
             report_file.write(data)
-        #os.system('cp /home/pi/pythonProject/reports/{} /var/www/html/test/'.format(report_name))

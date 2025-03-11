@@ -10,8 +10,8 @@ logger.setup_logger(LOGGER)
 ERRORS_THRESHOLD = 8    # Number of exceptions that the program can catch in a row before closing itself.
 
 # scan.setup()
-# scan.MonitoringMode()
-scan.kismet_run()
+#scan.kismet_run() 
+scan.monitoring_mode()
 
 
 def log_and_exit_creator():
@@ -24,6 +24,7 @@ def log_and_exit_creator():
         """
         nonlocal number_of_errors
         LOGGER.error(exception)
+        LOGGER.exception(exception)
         if number_of_errors == ERRORS_THRESHOLD:
             exit(1)
         number_of_errors += 1
@@ -34,7 +35,7 @@ def log_and_exit_creator():
 log_and_exit = log_and_exit_creator()
 
 while True:
-    default_sleep = 0.5     # seconds of wait time between
+    default_sleep = 1
     try:
         LOGGER.info("Scanning is started")
         scan.parse()
@@ -103,25 +104,25 @@ while True:
 
     try:
         LOGGER.info("Testing fast aircrack is started")
-        #testing.start_fast_aircrack()
+        testing.start_fast_aircrack()
         LOGGER.info("Testing fast aircrack has been performed")
     except Exception as e:
         LOGGER.error("ERROR problem during testing fast aircrack")
         log_and_exit(e)
         continue
 
-    time.sleep(default_sleep)
+    # time.sleep(default_sleep)
 
-    try:
-        LOGGER.info("Testing long aircrack is started")
-        #testing.start_long_aircrack()
-        LOGGER.info("Testing long aircrack has been performed")
-    except Exception as e:
-        LOGGER.error("ERROR problem during testing long aircrack")
-        log_and_exit(e)
-        continue
+    # try:
+    #     LOGGER.info("Testing long aircrack is started")
+    #     testing.start_long_aircrack()
+    #     LOGGER.info("Testing long aircrack has been performed")
+    # except Exception as e:
+    #     LOGGER.error("ERROR problem during testing long aircrack")
+    #     log_and_exit(e)
+    #     continue
 
-    time.sleep(default_sleep)
+    # time.sleep(default_sleep)
 
     try:
         LOGGER.info("Testing WiFi connection is started")
@@ -134,6 +135,3 @@ while True:
 
     scan.sleep()
     log_and_exit = log_and_exit_creator()   # Restart the counter of errors
-
-
-

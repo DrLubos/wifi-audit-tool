@@ -227,11 +227,8 @@ def start_gps_test(cursor, test_type: TestType, group_by: str):
         record_test(cursor, x[0][0], test_type.name, result.value, description)
         record_test(cursor, x[1][0], test_type.name, result.value, description)
 
-
 def start_fast_aircrack():
-    # Perform an aircrack test with small amount of passwords
-    start_aircrack('tests/data/hack/passwords_small.txt', TestType.AIRCRACK_FAST)
-
+	start_aircrack('tests/data/hack/passwords_small.txt', TestType.AIRCRACK_FAST)
 
 aircrack_thread = Thread()
 def start_long_aircrack():
@@ -267,7 +264,12 @@ def start_aircrack(passwords_path, test_type: TestType):
 
     result = cursor.execute("SELECT * from ownTableOfWifiAP WHERE ID NOT IN %s" % str(devices_str))
     for d in result.fetchall():
-        signal_strength = int(d[6])
+        # Moze nastat ze sila signalu je napisana ako 0 alebo '' (ziadna) program spadne
+        if d[6] == '':
+            signal_strength = 0
+        else:
+            signal_strength = int(d[6])
+        
         if signal_strength > LOW_SIGNAL_BOUND:
             # Skip the test if signal strength is too low
             continue
@@ -316,7 +318,7 @@ def checkConnection():
     result = cursor.execute('SELECT * from ownTableOfWifiAP WHERE Encryption = "Open" AND ID NOT IN %s' % str(devices_str))
     for d in result.fetchall():
         #connection_result =connection(d[4],"","wlan0")
-        connection_result = connection(d[4], "", "wlan0")
+        connection_result = connection(d[4], "", scan.SETUP[5])
         record_test(cursor, d[0], TestType.WIFI_CONNECT_CHECK.name, connection_result[1].value, connection_result[0])
 
     conn.commit()

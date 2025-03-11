@@ -6,27 +6,23 @@ from tests.TestResult import TestResult
 
 
 def connection(name, password, interface):
-        if password == "":
-            pom = os.popen("nmcli d wifi connect {} ifname {}".format(name, interface))
-        else:
-            pom = os.popen("nmcli d wifi connect {} password {} ifname {}".format(name, password, interface))
-        result = pom.read()
-        return_code = pom.close()
-        if "Error:" in result or return_code is not None:
-            print("Couldn't connect to name: {}".format(name))
-            return "",TestResult.OK
-        else:
-            print("Successfully connected to {} followed by running of Nmap port scan".format(name))
-            return nmapScan(getDefaultGateway()), TestResult.CONNECTION_SUCCESS
-
-
+	if password == "":
+		pom = os.popen("nmcli d wifi connect {} ifname {}".format(name, interface))
+	else:
+		pom = os.popen("nmcli d wifi connect {} password {} ifname {}".format(name, password, interface))
+	result = pom.read()
+	return_code = pom.close()
+	if "Error:" in result or return_code is not None:
+		print("Couldn't connect to name: {}".format(name))
+		return "",TestResult.OK
+	else:
+		print("Successfully connected to {} followed by running of Nmap port scan".format(name))
+		return nmapScan(getDefaultGateway()), TestResult.CONNECTION_SUCCESS
 
 
 def nmapScan(target):
     nmScan = nmap.PortScanner()
-    #nmScan.scan("{}".format(target),'21,22,23,80,443','-sV')
-    nmScan.scan("{}".format(target),'21,22,23,80,443',arguments='-sV --script vulners.nse')
-    #nmScan.scan("{}".format(target), '80', arguments='-sV --script vulners.nse')
+    nmScan.scan(target, '1-1024', arguments='-sV')
     print(nmScan.__dict__)
 
     for host in nmScan.all_hosts():
@@ -55,6 +51,7 @@ def getDefaultGateway():
     return Gateway[2]
 
 
+# this connection is made to enable the user to connect to this device
 if __name__ == "__main__":
     name = "Argo-2G"
     password = "Arginko913"

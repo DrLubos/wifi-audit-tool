@@ -6,7 +6,7 @@ import os
 if os.path.isdir('/var/www/html/logs') == False:
     os.mkdir('/var/www/html/logs')
 
-LOG_FILENAME = "logs/logging.log"
+LOG_FILENAME = "/var/www/html/logs/logging.log"
 LOG_FORMAT = '%(asctime)-15s %(levelname)s: %(message)s'
 FORMATTER = logging.Formatter(LOG_FORMAT)
 

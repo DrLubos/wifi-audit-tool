@@ -1,12 +1,40 @@
-from distutils.core import setup
-from setuptools import find_packages
-import os
-
-current_directory = os.path.dirname(os.path.abspath(__file__))
+from setuptools import setup, find_packages
 
 setup(
-    name="Raspberry sniffer",
+    name="Wi-Fi audit tool",
+    version="1.1",
+    description="Wi-Fi auditing and monitoring tool",
+    python_requires=">=3.11",
     packages=find_packages(),
-    version="1.0",
-    install_requires=["haversine >= 2.3.0", "psutil", "geopy"],
+    install_requires=[
+        "aiohttp",
+        "certifi",
+        "colorama",
+        "cryptography",
+        "docutils",
+        "geographiclib",
+        "geopy",
+        "haversine",
+        "IPython",
+        "jinja2",
+        "keyring",
+        "numba",
+        "numpy",
+        "pandas",
+        "Pillow",
+        "psutil",
+        "pytest",
+		"python-nmap",
+        "pytz",
+        "redis",
+        "requests",
+        "requests-oauthlib",
+        "scipy",
+        "setuptools",
+        "tqdm",
+        "urllib3",
+        "wheel",
+        "wmi",
+        "yarl"
+    ],
 )

@@ -7,6 +7,7 @@ import re
 import glob
 import logging
 import logger
+import scan
 from tests.TestResult import TestResult
 
 LOGGER = logging.getLogger(__name__)
@@ -20,8 +21,8 @@ def perform_test(device):
     """
 
     file_path = "./tests/data/hack"
-    airodump = subprocess.Popen("airodump-ng --bssid %s -c %s -w %s wlan0"
-                               % (device[0], device[1], file_path + "/hackme"), shell=True,)#stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #airodump = subprocess.Popen("airodump-ng --bssid %s -c %s -w %s wlan0" % (device[0], device[1], file_path + "/hackme"), shell=True,)#stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    airodump = subprocess.Popen("airodump-ng --bssid %s -c %s -w %s %s" % (device[0], device[1], file_path + "/hackme", scan.SETUP[5]), shell=True)
 
     std_err = ""
     try:
@@ -32,7 +33,8 @@ def perform_test(device):
     if std_err != "" and std_err is not None:
         LOGGER.error(std_err)
 
-    aireplay = subprocess.Popen("aireplay-ng -0 4 -a %s wlan0" % (device[0],), shell=True)
+    #aireplay = subprocess.Popen("aireplay-ng -0 4 -a %s wlan0" % (device[0],), shell=True)
+    aireplay = subprocess.Popen("aireplay-ng -0 4 -a %s %s" % (device[0], scan.SETUP[5]), shell=True)
     _, std_err = aireplay.communicate()
     aireplay.kill()
 

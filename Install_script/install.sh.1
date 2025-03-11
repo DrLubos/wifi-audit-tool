@@ -1,0 +1,48 @@
+.\" Manpage for install.sh
+.TH INSTALL.SH 1 "March 2025" "Version 1.1" "User Commands"
+.SH NAME
+install.sh \- installation script for wireless auditing and monitoring tools
+.SH SYNOPSIS
+.B sudo ./Install_script/install.sh
+.I -h | -a | -A | -k | -s | -w | -f
+.SH DESCRIPTION
+The 
+.B install.sh
+script automates the installation and configuration of several wireless auditing tools. It installs and configures:
+.IP "\fBaircrack-ng\fR"
+from either the Debian repository or from source,
+.IP "\fBkismet\fR"
+(including cloning/updating from GitHub, compiling, and installing with suid privileges),
+.IP "\fBGPS support for Kismet\fR"
+(by generating a custom configuration file), and
+.IP "\fBWiFi Audit tool\fR"
+(with a Python virtual environment setup).
+
+The script requires root privileges and verifies the user is running as root before proceeding. If no arguments are provided or an invalid option is used, a help message is displayed.
+.SH OPTIONS
+.TP
+.B \-h
+Display this help message and usage instructions.
+.TP
+.B \-a
+Install Aircrack-ng from the Debian repository. This option updates the package lists and installs the tool using the package manager.
+.TP
+.B \-A
+Install and compile Aircrack-ng from source. This option installs required build dependencies, clones the Aircrack-ng repository from GitHub, and compiles the tool.
+.TP
+.B \-k
+Install Kismet. This option installs the necessary dependencies, clones (or updates) the Kismet repository, configures, compiles, and installs Kismet with suid privileges. It also adds the current user to the kismet group.
+.TP
+.B \-s
+Configure Kismet for GPS support. This option detects the appropriate serial device (ACM0 or ACM1), and creates a custom 
+.IR kismet_site.conf 
+file in the appropriate directory with GPS configuration.
+.TP
+.B \-w
+Install the WiFi Audit tool. This option installs Python3 and its virtual environment tools, then sets up a virtual environment in the specified (or current) directory, and runs the tool’s setup script.
+.TP
+.B \-f
+Perform a full installation. This option sequentially executes the following: installing Aircrack-ng from the repository, installing Kismet and installing the WiFi Audit tool.
+.SH REQUIREMENTS
+The script must be executed with root privileges.
+Dependencies include standard Linux development packages (e.g., build-essential, git) and various libraries required by Kismet and Aircrack-ng. Ensure that the system has an active internet connection to update package lists and download source code.
