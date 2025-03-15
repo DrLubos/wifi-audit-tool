@@ -2,12 +2,20 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
+levels = {
+	"DEBUG": logging.DEBUG,
+	"INFO": logging.INFO,
+	"WARNING": logging.WARNING,
+	"ERROR": logging.ERROR,
+	"CRITICAL": logging.CRITICAL
+}
+
 
 class ColoredFormatter(logging.Formatter):
 	COLORS = {
 		logging.DEBUG: "\033[32m",		# Green
 		logging.INFO: "\033[34m",		# Blue
-		logging.WARNING: "\033[33m",  # Yellow
+		logging.WARNING: "\033[33m",  	# Yellow
 		logging.ERROR: "\033[31m",		# Red
 		logging.CRITICAL: "\033[1;31;47m"  # Red bold on white background
 	}
@@ -44,7 +52,8 @@ class Logger:
 		self.logger.setLevel(logging.DEBUG)  # Najnižšia úroveň zachytenia
 
 		if not self.logger.handlers:
-			os.makedirs(os.path.dirname(log_file), exist_ok=True)
+			if log_file:
+				os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
 			# Rotating file handler with max 5MB per file and 3 backups
 			file_handler = RotatingFileHandler(
@@ -63,6 +72,9 @@ class Logger:
 
 			self.logger.addHandler(file_handler)
 			self.logger.addHandler(console_handler)
+
+		# Disable propagation to avoid duplicate logs
+		self.logger.propagate = False
 
 	def debug(self, message: str) -> None:
 		self.logger.debug(message)
@@ -93,11 +105,4 @@ def get_logger(logger_name: str = "app", log_file: str = "logs/app.log", file_le
 	Returns:
 		Logger: Logger instance
 	"""
-	levels = {
-		"DEBUG": logging.DEBUG,
-		"INFO": logging.INFO,
-		"WARNING": logging.WARNING,
-		"ERROR": logging.ERROR,
-		"CRITICAL": logging.CRITICAL
-	}
 	return Logger(logger_name, log_file, file_level=levels[file_level], console_level=levels[console_level])
