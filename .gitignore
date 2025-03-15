@@ -1,11 +1,14 @@
 .ignore/
 .vscode/
+.env
+pyrightconfig.json
 
 build/
 venv/
 *.egg-info/
 __pycache__/
 
+config/config.json
 kismet/
 logs/
 old/
