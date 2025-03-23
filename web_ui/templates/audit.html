@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="display: flex; align-items: center; justify-content: space-evenly;">
+	<h1>Audit</h1>
+	<span id="audit-status"
+		style="margin: 0 20px; font-size: 1.4em; font-weight:bold; color: rgb(0, 145, 255);">Getting</span>
+	<button id="audit-toggle" onclick="toggleAudit()" style="font-size: large; font-weight: bolder;">START</button>
+</div>
+<div id="audit-modules">
+	<div id="kismet-control" class="audit-control">
+		<span>Kismet: </span>
+		<span id="kismet-status" style="font-weight:bold; color: rgb(0, 145, 255);">Getting</span>
+	</div>
+	<div id="parser-control" class="audit-control">
+		<span>Parser: </span>
+		<span id="parser-status" style="font-weight:bold; color: rgb(0, 145, 255);">Getting</span>
+	</div>
+	<div id="testing-control" class="audit-control">
+		<span>Testing: </span>
+		<span id="testing-status" style="font-weight:bold; color: rgb(0, 145, 255);">Getting</span>
+		<span id="current-test" style="font-weight:bold; color: white;"></span>
+	</div>
+</div>
+<style>
+	/* Blinking effect */
+	@keyframes blink {
+		50% {
+			opacity: 60%;
+		}
+	}
+
+	.blinking {
+		animation: blink 1s infinite;
+	}
+</style>
+<script lang="javascript">
+	async function updateStatuses() {
+		try {
+			// fetch status from endpoint
+			const response = await fetch('/audit/status');
+			const data = await response.json();
+			const auditRunning = data.running;
+			const kismetRunning = data.modules.kismet;
+			const parserRunning = data.modules.parser;
+			const testingRunning = data.modules.testing[0];
+			const currentTest = data.modules.testing[1];
+
+			if (auditRunning) {
+				document.getElementById("audit-toggle").textContent = "STOP";
+			} else {
+				document.getElementById("audit-toggle").textContent = "START";
+			}
+
+			// update elements
+			updateElement("audit-status", auditRunning);
+			updateElement("kismet-status", kismetRunning);
+			updateElement("parser-status", parserRunning);
+			updateElement("testing-status", testingRunning, currentTest);
+
+			function updateElement(id, status, test = null) {
+				const el = document.getElementById(id);
+				el.classList.remove("blinking");
+				if (status) {
+					el.textContent = "Running";
+					el.style.color = "green";
+					el.classList.add("blinking");
+				} else {
+					if (auditRunning) {
+						el.textContent = "Waiting";
+						el.style.color = "yellow";
+						el.classList.add("blinking");
+					} else {
+						el.textContent = "Stopped";
+						el.style.color = "red";
+					}
+				}
+				if (test && status && auditRunning) {
+					const currentTestEl = document.getElementById("current-test");
+					let testText = "";
+					switch (test) {
+						case 1:
+							testText = "MAC";
+							break;
+						case 2:
+							testText = "SSID";
+							break;
+						case 3:
+							testText = "ENCRYPTION";
+							break;
+						case 4:
+							testText = "GPS";
+							break;
+						default:
+							testText = "Unknown";
+					}
+					currentTestEl.textContent = `Current test: '${testText}'`;
+				} else {
+					const currentTestEl = document.getElementById("current-test");
+					currentTestEl.textContent = "";
+				}
+			}
+		} catch (error) {
+			console.error("Error updating statuses:", error);
+		}
+	}
+	window.addEventListener('load', () => {
+		updateStatuses();
+	});
+
+	let updateInterval;
+
+	function handleVisibilityChange() {
+		if (document.hidden) {
+			clearInterval(updateInterval);
+		} else {
+			clearInterval(updateInterval);
+			updateInterval = setInterval(updateStatuses, 1000);
+		}
+	}
+
+	document.addEventListener("visibilitychange", handleVisibilityChange);
+
+	handleVisibilityChange();
+
+	function toggleAudit() {
+		const toggleBtn = document.getElementById("audit-toggle");
+		const currentAction = toggleBtn.textContent.trim().toLowerCase();
+		let action = (currentAction === "start") ? "start" : "stop";
+		fetch("/audit", {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: "action=" + action
+
+		})
+			.then(response => response.json())
+			.then(data => {
+				updateStatuses();
+			})
+			.catch(error => console.error("Error toggling audit:", error));
+	}
+
+</script>
+{% endblock %}

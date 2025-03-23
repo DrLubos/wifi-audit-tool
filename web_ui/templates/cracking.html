@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="display: flex; align-items: center; justify-content: space-evenly;">
+	<h1>Audit</h1>
+	<span id="audit-status" style="margin: 0 20px; font-size: 1.4em; font-weight:bold; color: red;">Stopped</span>
+	<button id="audit-toggle" onclick="toogleCrack()" style="font-size: large; font-weight: bolder;">START</button>
+</div>
+<div id="cracking-control" class="audit-control">
+	<form method="post"></form>
+		<span>Type: </span>
+		<input type="radio" name="crack_type" id="type_fast" value="fast">Fast
+		<input type="radio" name="crack_type" id="type_slow" value="slow">Slow
+		<button id="cracking-toggle" onclick="changeType()" style="font-size: large; font-weight: bolder; font-size: 12px; padding: 1px 4px">CHANGE</button>
+	</form>
+</div>
+{% endblock %}
