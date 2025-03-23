@@ -91,6 +91,9 @@ class Logger:
 	def critical(self, message: str) -> None:
 		self.logger.critical(message)
 
+	def exception(self, message: str) -> None:
+		self.logger.exception(message)
+
 
 def get_logger(logger_name: str = "app", log_file: str = "logs/app.log", file_level: str = "WARNING", console_level: str = "DEBUG") -> Logger:
 	"""
