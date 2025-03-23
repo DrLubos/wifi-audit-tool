@@ -1,49 +1,34 @@
 import os
 import binascii
-import threading
 import time
 from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from flask_terminal import terminal_blueprint
+from flask_terminal import terminal_blueprint # Import the terminal blueprint /terminal
 
 from config import get_config
 from logger import get_logger
 from system_hardware import get_interfaces_info
-from dotenv import load_dotenv
 
-if os.path.exists('.env'):
-	load_dotenv('.env')
-else:
-	print("Warning: .env file not found. No user authentication data loaded.")
-
-# Expected format in .env: USERS=admin:password123,user:pass456
-users_env = os.getenv("USERS", "")
-USERS = {}
-if users_env:
-	for user_entry in users_env.split(","):
-		try:
-			username, password = user_entry.split(":")
-			USERS[username.strip()] = password.strip()
-		except Exception as e:
-			print(f"Error parsing user entry '{user_entry}': {e}")
+# Do not turn on terminal if you not gonna use it.
+DISABLE_TERMINAL = True 
 
 CONFIG_INSTANCE = get_config()
 CONFIG = CONFIG_INSTANCE.CONFIG
+USERS = CONFIG_INSTANCE.USERS
 
-LOGGER = get_logger(
-	CONFIG["logger"]["name"],
-	CONFIG["logger"]["file"],
-	CONFIG["logger"]["file_level"],
-	CONFIG["logger"]["console_level"]
-)
+LOGGER = get_logger(*CONFIG_INSTANCE.get_logger_settings())
 
 app = Flask(__name__)
-app.secret_key = binascii.hexlify(os.urandom(24)).decode()
+app.template_folder = "web_ui/templates"
+app.static_folder = "web_ui/static"
+app.secret_key = "1b13068a8084656dfe156ecc8a26d3d05"
 
-# Secure session cookie settings
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True with HTTPS in production
 app.permanent_session_lifetime = timedelta(days=7)
+
+from audit_modules.audit import audit_bp
+app.register_blueprint(audit_bp) # {{url}}}/audit
 
 # Enforce login on all routes except for login and static assets.
 @app.before_request
@@ -93,23 +78,26 @@ def index():
 
 @app.route('/config', methods=['GET', 'POST'])
 def config():
+	from audit_modules.audit import get_audit_details
+	if get_audit_details()[0]: # [0] is audit running status
+		flash("Configuration editing is disabled while audit is running.", category="error")
+		return redirect(url_for('audit.audit'))
 	if request.method == 'POST':
 		# Update configuration with form values
 		CONFIG['interface']['monitoring'] = request.form.get('interface_monitoring')
-		CONFIG['interface']['scanning'] = request.form.get('interface_scanning')
+		CONFIG['interface']['cracking'] = request.form.get('interface_cracking')
 		CONFIG['logger']['name'] = request.form.get('logger_name')
 		CONFIG['logger']['file'] = request.form.get('logger_file')
 		CONFIG['logger']['console_level'] = request.form.get('logger_console_level')
 		CONFIG['logger']['file_level'] = request.form.get('logger_file_level')
 		CONFIG['kismet']['file'] = request.form.get('kismet_file')
 		CONFIG['scan_type'] = int(request.form.get('scan_type') or 1)
-		CONFIG['recheck'] = int(request.form.get('recheck') or 600)
 		CONFIG['main_sleep'] = int(request.form.get('main_sleep') or 2)
 		CONFIG['max_ap_distance'] = int(request.form.get('max_ap_distance') or 50)
-		CONFIG['errors_threshold'] = int(request.form.get('errors_threshold') or 5)
 		CONFIG['enable_terminal'] = request.form.get('enable_terminal') == 'on'
 
 		CONFIG_INSTANCE.save_config()
+		CONFIG_INSTANCE.load_config()
 		LOGGER.info(f"{session.get('user', 'Unknown user')} - Configuration saved.")
 		flash("Configuration saved successfully!")
 		return redirect(url_for('home'))
@@ -121,9 +109,9 @@ def config():
 def home():
 	return render_template('home.html', config=CONFIG)
 
-@app.route('/audit')
-def audit():
-	return render_template('temp.html')
+@app.route('/cracking')
+def cracking():
+	return render_template('cracking.html')
 
 @app.route('/report')
 def report():
@@ -132,9 +120,7 @@ def report():
 @app.route('/log')
 def log():
 	"""Render the log page."""
-	with open(CONFIG['logger']['file'], 'r') as log_file:
-		log_content = log_file.read()
-	return render_template('log.html', log_content=log_content)
+	return render_template('log.html', log_content=log_data())
 
 @app.route('/log_data')
 def log_data():
@@ -143,11 +129,48 @@ def log_data():
 		log_content = log_file.read()
 	return log_content
 
+# ++++++++++++++++++++++KISMET++++++++++++++++++++++
+@app.route('/kismet')
+def kismet():
+	"""Redirect to kismet web server that is hosted on the port 2501."""
+	next_url = request.args.get('next', 'None')
+	if next_url == "None":
+		next_url = url_for('home')
+	return redirect(f"http://{next_url}:2501")
+
+# ----------------------KISMET----------------------
+
+@app.route('/system_shutdown', methods=['GET', 'POST'])
+def system_shutdown():
+	"""Shutdown the system."""
+	if request.method == 'POST':
+		confirmation = request.form.get('confirmation')
+		if confirmation == 'yes':
+			LOGGER.info(f"{session.get('user', 'Unknown user')} - System shutdown.")
+			os.system("sudo shutdown now")
+			return redirect(url_for('home'))
+		else:
+			flash("System shutdown canceled.", category="info")
+			return redirect(url_for('home'))
+	return render_template('confirm_shutdown.html')
+
+
+@app.route('/clear_kismet')
+def clear_kismet():
+	# remove all files in CONFIG['kismet']['file'] folder
+	try:
+		for file in os.listdir(CONFIG['kismet']['file']):
+			os.remove(os.path.join(CONFIG['kismet']['file'], file))
+		flash("Kismet files cleared successfully!", category="info")
+	except Exception as e:
+		LOGGER.error(f"Failed to clear kismet files: {e}")
+		flash("Failed to clear kismet files.", category="error")
+	return redirect(url_for('home'))
+
 @app.route('/ping')
 def ping():
 	"""
 	Respond to a ping request.
-
 	"""
 	try:
 		return 'pong', 200
@@ -157,7 +180,6 @@ def ping():
 
 @terminal_blueprint.before_request
 def before_terminal_request():
-	DISABLE_TERMINAL = True
 	if DISABLE_TERMINAL:
 		flash("Terminal is disabled by script.", category="error")
 		return redirect(url_for('home'))
@@ -176,7 +198,6 @@ def main():
 		time.sleep(5)
 
 if __name__ == '__main__':
-	#main_thread = threading.Thread(target=main)
-	#main_thread.start()
-	app.run(debug=True, host="0.0.0.0")
-
+	#print(app.url_map)
+	#app.run(debug=False, use_reloader=False, host="0.0.0.0")
+	app.run(debug=True, host="0.0.0.0", port=5000)
