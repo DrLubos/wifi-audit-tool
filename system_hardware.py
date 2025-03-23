@@ -11,6 +11,7 @@ def get_wifi_interfaces() -> List[str]:
 	"""
 	interfaces = os.listdir("/sys/class/net")
 	wifi_interfaces = [iface for iface in interfaces if iface.startswith("wlan")]
+	wifi_interfaces = [iface for iface in wifi_interfaces if iface.endswith("mon") == False]
 	return wifi_interfaces
 
 
@@ -71,6 +72,9 @@ def get_interfaces_info() -> List[Dict[str, str]]:
 	"""
 	results: List[Dict[str, str]] = []
 	wifi_ifaces = get_wifi_interfaces()
+	# remove wlan0 from wifi_ifaces
+	if "wlan0" in wifi_ifaces:
+		wifi_ifaces.remove("wlan0")
 	wifi_ifaces.sort()
 	for iface in wifi_ifaces:
 		info = {
