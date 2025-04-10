@@ -1,17 +1,208 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+    /* Blinking effect */
+    @keyframes blink {
+        50% {
+            opacity: 60%;
+        }
+    }
 
+    .blinking {
+        animation: blink 1s infinite;
+    }
+</style>
 <div style="display: flex; align-items: center; justify-content: space-evenly;">
-	<h1>Audit</h1>
-	<span id="audit-status" style="margin: 0 20px; font-size: 1.4em; font-weight:bold; color: red;">Stopped</span>
-	<button id="audit-toggle" onclick="toogleCrack()" style="font-size: large; font-weight: bolder;">START</button>
+    <h1>Cracking</h1>
+    <span id="cracking-status" style="margin: 0 20px; font-size: 1.4em; font-weight:bold; color: blue;">Getting</span>
 </div>
-<div id="cracking-control" class="audit-control">
-	<form method="post"></form>
-		<span>Type: </span>
-		<input type="radio" name="crack_type" id="type_fast" value="fast">Fast
-		<input type="radio" name="crack_type" id="type_slow" value="slow">Slow
-		<button id="cracking-toggle" onclick="changeType()" style="font-size: large; font-weight: bolder; font-size: 12px; padding: 1px 4px">CHANGE</button>
-	</form>
+<div id="controls">
+    <button id="scan-btn" onclick="scanAPs()">Scan for Access Points</button>
+    <div id="ap-selection" style="display:none;">
+        <label for="ap-list">Select a Wi-Fi Access Point:</label>
+        <select id="ap-list"></select>
+        <br />
+    </div>
+    <br>
+    <div id="crack-controls" style="display: none;">
+        <!-- <label>Select Cracking Method:</label>
+		<input type="radio" name="method" value="hashcat" checked> Linux hashcat
+		<input type="radio" name="method" value="aircrack"> aircrack-ng
+		<br /><br /> -->
+        <input type="hidden" name="method" value="aircrack">
+        <button id="start-btn" onclick="startCrack()">START</button>
+        <button id="stop-btn" onclick="stopCrack()" style="display:none;">STOP</button>
+    </div>
 </div>
+
+<pre id="status-box"
+    style="display: none; background:#0b0c10; padding:10px; color:#c5c6c7; height:300px; overflow:auto;">Stopped</pre>
+
+{% if cracked_ap %}
+
+<h2>Cracked APs:</h2>
+<div style="background:#0b0c10; padding:10px; color:#c5c6c7; overflow:auto;">
+    <pre>
+        {% for ap in cracked_ap %}
+        {{ ap }} <br>
+        {% endfor %}
+    </pre>
+</div>
+{% endif %}
+
+<script>
+    function scanAPs() {
+        // Disable the scan button during scanning.
+        let scanBtn = document.getElementById("scan-btn");
+        scanBtn.disabled = true;
+        document.getElementById("status-box").style.display = "block";
+        fetch("{{ url_for('cracking.scan') }}")
+            .then(response => response.json())
+            .then(data => {
+                let apSelect = document.getElementById("ap-list");
+                apSelect.innerHTML = "";
+                if (data.error) {
+                    document.getElementById("status-box").innerText += data.error;
+                    scanBtn.disabled = false;
+                    return;
+                }
+                data.forEach(ap => {
+                    let option = document.createElement("option");
+                    option.value = JSON.stringify(ap);
+                    option.text = ap.ssid + " - " + ap.bssid + " (CH " + ap.channel + ")";
+                    apSelect.add(option);
+                });
+
+                document.getElementById("ap-selection").style.display = "block";
+                pollStatus();
+                // Re-enable the scan button.
+                scanBtn.disabled = false;
+                document.getElementById("crack-controls").style.display = "block";
+            })
+            .catch(error => {
+                document.getElementById("status-box").innerText += "Error: " + error;
+                scanBtn.disabled = false;
+            });
+    }
+
+    function startCrack() {
+        let apData = JSON.parse(document.getElementById("ap-list").value);
+        //let method = document.querySelector('input[name="method"]:checked').value;
+        let method = document.querySelector('input[name="method"]').value;
+
+        document.getElementById("scan-btn").disabled = true;
+        document.getElementById("scan-btn").style.display = "none";
+        document.getElementById("ap-selection").style.display = "none";
+
+        // Hide the START button and show the STOP button.
+        document.getElementById("start-btn").style.display = "none";
+        document.getElementById("stop-btn").style.display = "inline-block";
+        fetch("{{ url_for('cracking.start') }}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                ssid: apData.ssid,
+                bssid: apData.bssid,
+                channel: apData.channel,
+                method: method
+            })
+        }).then(response => response.json())
+            .then(data => {
+                console.log(data);
+            });
+        pollStatus();
+    }
+
+    function stopCrack() {
+        fetch("{{ url_for('cracking.stop') }}", {
+            method: "POST"
+        }).then(response => response.json())
+            .then(data => {
+                console.log(data);
+            });
+        // Hide the STOP button and show the START button.
+        document.getElementById("stop-btn").style.display = "none";
+        document.getElementById("start-btn").style.display = "inline-block";
+
+        document.getElementById("scan-btn").disabled = false;
+        document.getElementById("scan-btn").style.display = "block";
+        document.getElementById("ap-selection").style.display = "block";
+    }
+
+    function pollStatus() {
+        fetch("{{ url_for('cracking.status') }}")
+            .then(response => response.json())
+            .then(data => {
+                let statusText = document.getElementById("cracking-status");
+                if (data.scanning) {
+                    // When user presses scan button, change to "Scanning" (green)
+                    statusText.innerText = "Scanning";
+                    statusText.style.color = "green";
+                } else if (data.running) {
+                    // When user presses start button, change to "Running" (green)
+                    statusText.innerText = "Running";
+                    statusText.style.color = "green";
+
+                    document.getElementById("crack-controls").style.display = "block";
+                    document.getElementById("scan-btn").disabled = true;
+                    document.getElementById("scan-btn").style.display = "none";
+                    document.getElementById("ap-selection").style.display = "none";
+
+                    // Hide the START button and show the STOP button.
+                    document.getElementById("start-btn").style.display = "none";
+                    document.getElementById("stop-btn").style.display = "inline-block";
+                } else if (document.getElementById("ap-selection").style.display === "block") {
+                    // When scan finishes but cracking hasn't started, change to "Waiting" (yellow)
+                    statusText.innerText = "Waiting";
+                    statusText.style.color = "yellow";
+                } else if (data.log != "") {
+                    // Hide the STOP button and show the START button.
+                    document.getElementById("stop-btn").style.display = "none";
+                    document.getElementById("start-btn").style.display = "inline-block";
+
+                    document.getElementById("scan-btn").disabled = false;
+                    document.getElementById("scan-btn").style.display = "block";
+                    document.getElementById("ap-selection").style.display = "block";
+                }
+                else {
+                    // On init and when cracking stops, change to "Stopped" (red)
+                    statusText.innerText = "Stopped";
+                    statusText.style.color = "red";
+                }
+
+                if (data.running || data.scanning || data.log) {
+                    document.getElementById("status-box").innerText = data.log || "No status yet.";
+                    document.getElementById("status-box").style.display = "block";
+                    scrollStatus();
+                } else {
+                    // When cracking stops, ensure the buttons are toggled appropriately.
+                    document.getElementById("stop-btn").style.display = "none";
+                    document.getElementById("start-btn").style.display = "inline-block";
+                }
+            });
+    }
+    pollStatus();
+
+    let updateInterval;
+
+    function handleVisibilityChange() {
+        if (document.hidden) {
+            clearInterval(updateInterval);
+        } else {
+            clearInterval(updateInterval);
+            updateInterval = setInterval(pollStatus, 1000);
+        }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    handleVisibilityChange();
+
+    function scrollStatus() {
+        var statusBox = document.getElementById("status-box");
+        statusBox.scrollTop = statusBox.scrollHeight;
+    }
+</script>
 {% endblock %}
