@@ -37,6 +37,7 @@ class Config:
 		with open(self._config_file, "r") as f:
 			config = json.load(f)
 
+		config["kismet"] = "kismet"
 		self.CONFIG.clear()
 		self.CONFIG.update(config)
 
@@ -70,11 +71,11 @@ class Config:
 		Returns the logger settings.
 		
 		Returns:
-			tuple: Logger settings
+			tuple: Logger settings name, log file path, file level, console level
 		"""
 		return (
-			self.CONFIG["logger"]["name"],
-			self.CONFIG["logger"]["file"],
+			"app",
+			"logs/app.log",
 			self.CONFIG["logger"]["file_level"],
 			self.CONFIG["logger"]["console_level"]
 		)
@@ -83,13 +84,13 @@ class Config:
 _config_instance = None
 
 def get_config() -> Config:
-    """
-    Returns a singleton Config instance.
-    
-    Returns:
-        Config: Config instance
-    """
-    global _config_instance
-    if _config_instance is None:
-        _config_instance = Config()
-    return _config_instance
+	"""
+	Returns a singleton Config instance.
+	
+	Returns:
+		Config: Config instance
+	"""
+	global _config_instance
+	if _config_instance is None:
+		_config_instance = Config()
+	return _config_instance

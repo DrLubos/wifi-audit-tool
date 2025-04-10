@@ -1,21 +1,14 @@
 {
     "interface": {
         "monitoring": "wlan1",
-        "scanning": "wlan2"
+        "cracking": "wlan2"
     },
-	"kismet": {
-		"file": "./kismet"
-	},
     "logger": {
-        "name": "wifi-audit",
-        "file": "./logs/wifi-audit.log",
         "console_level": "DEBUG",
         "file_level": "DEBUG"
     },
-    "scan_type": 1,
-    "recheck": 600,
+    "scan_type": 0,
     "main_sleep": 2,
-    "max_ap_distance": 50,
-    "errors_threshold": 5,
-	"enable_terminal": false
+	"enable_terminal": false,
+    "max_ap_distance": 50
 }
