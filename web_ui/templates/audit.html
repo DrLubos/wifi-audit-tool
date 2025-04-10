@@ -7,6 +7,24 @@
 		style="margin: 0 20px; font-size: 1.4em; font-weight:bold; color: rgb(0, 145, 255);">Getting</span>
 	<button id="audit-toggle" onclick="toggleAudit()" style="font-size: large; font-weight: bolder;">START</button>
 </div>
+<div style="display: flex;align-items: flex-start;justify-content: space-evenly;flex-direction: column;">
+    <label for="enable_cracking">
+        Enable cracking:
+        <input type="checkbox" id="enable_cracking" name="enable_cracking">
+    </label>
+    <label for="cracking_time" id="cracking_time_label" style="display: none;">
+        Handshake capture time:
+        <input type="number" id="cracking_time" name="cracking_time">
+    </label>
+    <label for="cracking_type" id="cracking_type_label" style="display: none;">
+        Cracking type:
+        <select id="cracking_type" name="cracking_type">
+            <option value="rockyoutxt">rockyoutxt</option>
+            <option value="customPasswordList">customPasswordList</option>
+        </select>
+    </label>
+</div>
+<br>
 <div id="audit-modules">
 	<div id="kismet-control" class="audit-control">
 		<span>Kismet: </span>
@@ -34,6 +52,19 @@
 		animation: blink 1s infinite;
 	}
 </style>
+<script lang="javascript">
+    document.getElementById("enable_cracking").addEventListener("change", function() {
+        const crackingTimeInput = document.getElementById("cracking_time_label");
+        const crackingTypeInput = document.getElementById("cracking_type_label");
+        if (this.checked) {
+            crackingTimeInput.style.display = "block"; // Show the input field
+            crackingTypeInput.style.display = "block"; // Show the input field
+        } else {
+            crackingTimeInput.style.display = "none"; // Hide the input field
+            crackingTypeInput.style.display = "none"; // Hide the input field
+        }
+    });
+</script>
 <script lang="javascript">
 	async function updateStatuses() {
 		try {
@@ -91,6 +122,9 @@
 						case 4:
 							testText = "GPS";
 							break;
+                        case 7:
+                            testText = "CRACKING"
+                            break;
 						default:
 							testText = "Unknown";
 					}
@@ -127,10 +161,18 @@
 		const toggleBtn = document.getElementById("audit-toggle");
 		const currentAction = toggleBtn.textContent.trim().toLowerCase();
 		let action = (currentAction === "start") ? "start" : "stop";
+        const bodyData = new URLSearchParams();
+        const enableCracking = document.getElementById("enable_cracking").checked;
+	    const crackingTime = document.getElementById("cracking_time").value;
+        const crackingType = document.getElementById("cracking_type").value;
+        bodyData.append("action", action);
+        bodyData.append("enable_cracking", enableCracking);
+        bodyData.append("cracking_time", crackingTime);
+        bodyData.append("cracking_type", crackingType);
 		fetch("/audit", {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: "action=" + action
+			body: bodyData.toString()
 
 		})
 			.then(response => response.json())

@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 from config import get_config
@@ -24,11 +25,20 @@ def audit():
 	if request.method == 'POST':
 		action = request.form.get('action')
 		if action == "start":
+			enable_cracking = request.form.get('enable_cracking') == 'true'
+			handshake_capture_time = request.form.get('cracking_time')
+			cracking_type = request.form.get('cracking_type')
+			try:
+				handshake_capture_time = int(handshake_capture_time) if handshake_capture_time else 60
+			except ValueError:
+				handshake_capture_time = 60
+
 			if not audit_loop_running:
 				start_kismet()
-				time.sleep(5) # wait for Kismet to start
+				time.sleep(10) # wait for Kismet to start
 				audit_loop_running = True
-				audit_loop_thread = threading.Thread(target=audit_loop, daemon=True) 
+				audit_loop_thread = threading.Thread(target=audit_loop, args=(
+					enable_cracking, handshake_capture_time, cracking_type,), daemon=True)
 				audit_loop_thread.start()
 				LOGGER.info("Audit started.")
 		elif action == "stop":
@@ -38,6 +48,8 @@ def audit():
 			audit_loop_running = False
 			audit_loop_thread = None
 			LOGGER.info("Audit stopped.")
+			#execute systemctl restart wifi_audit_tool
+			os.system("systemctl restart wifi_audit_tool")
 		return jsonify({"running": audit_loop_running})
 	return render_template('audit.html')
 
@@ -64,13 +76,18 @@ def get_audit_details() -> tuple[bool, dict[str, bool]]:
 	}
 	return running, modules
 
-def audit_loop():
+
+def audit_loop(cracking_type, enable_cracking: bool = False, handshake_capture_time: int = 60) -> None:
 	"""
 	Main audit loop. Runs the audit modules in a loop."
+	
+	Parameters:
+		enable_cracking (bool): Whether to enable cracking.
+		handshake_capture_time (int): Time to wait while capturing handshakes (time in 'seconds').
 	"""
 	global audit_loop_running
 	while audit_loop_running:
 		parse()
-		time.sleep(0.1)
-		test()
+		time.sleep(0.4)
+		test(cracking_type, enable_cracking, handshake_capture_time)
 		time.sleep(CONFIG["main_sleep"])

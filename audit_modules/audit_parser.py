@@ -1,3 +1,4 @@
+import json
 import re
 
 from config import get_config
@@ -19,12 +20,15 @@ PARSER_RUNNING = False
 def parse():
 	global PARSER_RUNNING, CONN, CURSOR, send_to_kismet_api
 	PARSER_RUNNING = True
-	# Database needs to be initialized here because kismet is not running yet when the module is imported.
 	from db_handler import get_database_handler
 	CONN = get_database_handler().get_conn()
 	CURSOR = get_database_handler().get_cursor()
 	send_to_kismet_api = get_database_handler().send_to_kismet_api
-	parse_devices()
+	try:
+		parse_devices()
+	except Exception as e:
+		LOGGER.exception(f"Error parsing devices: {e}")
+
 	PARSER_RUNNING = False
 
 
@@ -34,6 +38,12 @@ def stop_parser():
 
 
 def get_parser_status():
+	"""
+	Get the status of the parser.
+
+	Returns:
+		bool: True if the parser is running, False otherwise
+	"""
 	global PARSER_RUNNING
 	return PARSER_RUNNING
 
@@ -51,58 +61,73 @@ def parse_devices():
 	if len(data) == 0:
 		LOGGER.warning("No data received from Kismet API.")
 		return
-	gps_response = send_to_kismet_api("/gps/location.json")
-	gps_response = gps_response["kismet.common.location.geopoint"]
-	current_location = tuple(gps_response)
 
-	try:
-		with CONN:
-			for device in data:
-				mac_address = str(device["kismet.device.base.macaddr"])
-				manufacturer = str(device["kismet.device.base.manuf"])
-				ssid_channel = str(device["kismet.device.base.channel"])
-				ssid = str(device["kismet.device.base.name"])
-				encryption = str(device["kismet.device.base.crypt"])
-				signal_strength = str(
-					device["kismet.device.base.signal"]["kismet.common.signal.min_signal"])
+	with CONN:
+		for device in data:
+			ssid = str(device["kismet.device.base.name"])
+			# Filter out APs that should not be processed.
+			if not filter_AP_from_file(ssid):
+				continue
+			
+			if ssid == "WifiAudit":
+				continue 
 
-				# Filter out APs that should not be processed.
-				if not filter_AP_from_file(ssid):
-					continue
+			mac_address = str(device["kismet.device.base.macaddr"])
+			manufacturer = str(device["kismet.device.base.manuf"])
+			ssid_channel = str(device["kismet.device.base.channel"])
+			freq_map = str(device["kismet.device.base.freq_khz_map"])
+			# change every ' in freq_map to "
+			freq_map = freq_map.replace("'", '"')
+			encryption = str(device["kismet.device.base.crypt"])
+			device_signal = device["kismet.device.base.signal"]
+			if device_signal is not None:
+				try:
+					average_location = device_signal["kismet.common.signal.peak_loc"]["kismet.common.location.geopoint"]
+				except Exception as e:
+					LOGGER.error(f"Error parsing average location: {e}")
+					average_location = [0.0, 0.0]
+			else:
+				average_location = [0.0, 0.0]
+			# average_location = [19.59914, 49.088724]
+			lon_avg = float(average_location[0])
+			lat_avg = float(average_location[1])
+			if lon_avg == 0.0 and lat_avg == 0.0:
+				lon_avg = None
+				lat_avg = None
 
-				# Check if the device already exists.
-				query = "SELECT ID FROM devices WHERE mac_address = ? AND ssid_channel = ? AND ssid = ?"
-				CURSOR.execute(query, (mac_address, ssid_channel, ssid))
+			# Check if the device already exists in table by comparing ssid, mac_address, manufacturer, encryption.
+			query = "SELECT ID FROM devices WHERE ssid = ? AND mac_address = ? AND manufacturer = ? AND encryption = ?"
+			CURSOR.execute(query, (ssid, mac_address, manufacturer, encryption))
+			result = CURSOR.fetchone()
+			if result:
+				device_id = result[0]  # found device in the table.
+				# Update the avg_gps, ssid_channels and frequency_map for the device.
+				query_update = "SELECT ssid_channels FROM devices WHERE ID = ?"
+				CURSOR.execute(query_update, (device_id,))
 				result = CURSOR.fetchone()
 				if result:
-					device_id = result[0]
-				else:
-					# Insert new device record.
-					query_insert = (
-						"INSERT INTO devices (mac_address, manufacturer, ssid_channel, ssid, encryption, signal_strength) "
-						"VALUES (?, ?, ?, ?, ?, ?)"
-					)
-					CURSOR.execute(query_insert, (mac_address, manufacturer,
-                                            ssid_channel, ssid, encryption, signal_strength))
-					device_id = CURSOR.lastrowid
-
-				# Insert GPS coordinates record for the device.
-				if current_location != (0, 0):
-					query_gps_insert = "INSERT INTO gps_coordinates (device_id, latitude, longitude) VALUES (?, ?, ?)"
-					CURSOR.execute(query_gps_insert, (device_id,
-                                            current_location[0], current_location[1]))
-
-				# Calculate the average latitude and longitude for the device.
-				query_avg = "SELECT AVG(latitude), AVG(longitude) FROM gps_coordinates WHERE device_id = ?"
-				CURSOR.execute(query_avg, (device_id,))
-				avg_coords = CURSOR.fetchone()
-				if avg_coords:
-					avg_lat, avg_lon = avg_coords
-					# Update the devices table with the average coordinates.
-					update_query = "UPDATE devices SET latitude_avg = ?, longitude_avg = ? WHERE ID = ?"
-					CURSOR.execute(update_query, (avg_lat, avg_lon, device_id))
-	except Exception as e:
-		LOGGER.exception(f"Error while filling database: {e}")
+					ssid_channels = result[0]
+					ssid_channel_list = json.loads(ssid_channels) if ssid_channels else []
+					if ssid_channel not in ssid_channel_list:
+						ssid_channel_list.append(ssid_channel)
+						ssid_channel_list = json.dumps(ssid_channel_list)
+						update_query = "UPDATE devices SET ssid_channels = ? WHERE ID = ?"
+						CURSOR.execute(update_query, (ssid_channel_list, device_id))
+				update_query = "UPDATE devices SET frequency_map = ? WHERE ID = ?"
+				CURSOR.execute(update_query, (freq_map, device_id))
+				update_query = "UPDATE devices SET lat_avg = ?, lon_avg = ? WHERE ID = ?"
+				CURSOR.execute(update_query, (lat_avg, lon_avg, device_id))
+			else:
+				# Insert new device record.
+				ssid_channel_list = json.dumps([ssid_channel])
+				query_insert = (
+					"INSERT INTO devices"
+					"(ssid, mac_address, manufacturer, ssid_channels, frequency_map, encryption, lat_avg, lon_avg) "
+					"VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+				)
+				CURSOR.execute(query_insert, (ssid, mac_address, manufacturer,
+							   ssid_channel_list, freq_map, encryption, lat_avg, lon_avg))
+				device_id = CURSOR.lastrowid
 
 
 def filter_AP_from_file(ssid: str) -> bool:
@@ -158,6 +183,9 @@ def filter_AP_from_file(ssid: str) -> bool:
 def get_scan_type_file() -> str:
 	"""
 	Returns the file name of the scan type file.
+
+	Returns:
+		str: The file name.
 	"""
 	scan_type = CONFIG["scan_type"]
 	if scan_type == 1:

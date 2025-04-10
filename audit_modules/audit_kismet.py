@@ -19,14 +19,14 @@ def start_kismet():
 	"""
 	monitoring_interface = CONFIG['interface']['monitoring']
 	command = f"kismet -c {monitoring_interface} --daemonize --silent"
-	#create folder CONFIG['kismet']['file'] if it does not exist
-	if not os.path.exists(CONFIG['kismet']['file']):
-		os.makedirs(CONFIG['kismet']['file'])
+	#create folder CONFIG['kismet'] if it does not exist
+	if not os.path.exists(CONFIG['kismet']):
+		os.makedirs(CONFIG['kismet'])
 	try:
 		subprocess.Popen(
 			command,
 			shell=True,
-			cwd=CONFIG['kismet']['file'],
+			cwd=CONFIG['kismet'],
 			stdout=subprocess.DEVNULL,
 			stderr=subprocess.DEVNULL
 		)
@@ -52,8 +52,9 @@ def stop_kismet():
 	except Exception as e:
 		LOGGER.error(f"An error occurred while stopping kismet: {e}")
 	finally:
-		# remove any .kismet-journal files from CONFIG['kismet']['file'] directory
-		subprocess.call(f"rm {CONFIG['kismet']['file']}/*.kismet-journal", shell=True)
+		# remove any .kismet-journal files from CONFIG['kismet'] directory
+		subprocess.call(f"rm {CONFIG['kismet']}/*.kismet-journal", shell=True)
+		subprocess.call(f"rm {CONFIG['kismet']}/*.kismet", shell=True)
 
 def get_kismet_status():
 	"""
