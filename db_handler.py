@@ -39,7 +39,7 @@ class DatabaseHandler:
 			self.logger.debug(f"Session cookies: {self.api_session.cookies.get_dict()}")
 			self.api_session.cookies.set('KISMET', token, path='/')  # type: ignore
 		else:
-			self.logger.debug(f"Login failed with status code {response.status_code}")
+			self.logger.error(f"Login failed with status code {response.status_code} and response {response.text}")
 
 	def init_db(self) -> None:
 		"""
@@ -50,8 +50,8 @@ class DatabaseHandler:
 		file_name = logfile_data["kismet.logfile.path"]
 		file_name = file_name[3:-7] # Remove ".//" from start and ".kismet" from the end.
 
-		db_path = self.config["kismet"]["file"] + "/" + file_name + ".sqlite3"
-		self.conn = sqlite3.connect(db_path)
+		db_path = self.config["kismet"] + "/" + file_name + ".sqlite3"
+		self.conn = sqlite3.connect(db_path, check_same_thread=False)
 		self.cursor = self.conn.cursor()
 
 		# Create the 'devices' table.
@@ -61,35 +61,35 @@ class DatabaseHandler:
 			"ssid VARCHAR(255), "
 			"mac_address VARCHAR(64), "
 			"manufacturer VARCHAR(255), "
-			"ssid_channel VARCHAR(255), "
+			"ssid_channels TEXT, "
+			"frequency_map TEXT, "
 			"encryption VARCHAR(64), "
-			"signal_strength INTEGER, "
-			"latitude_avg REAL, "
-			"longitude_avg REAL)"
+			"lat_avg REAL, "
+			"lon_avg REAL)"
 		)
 		self.cursor.execute(query_devices)
-
-		# Create the 'gps_coordinates' table.
-		query_gps = (
-			"CREATE TABLE IF NOT EXISTS gps_coordinates ("
-			"ID INTEGER PRIMARY KEY AUTOINCREMENT, "
-			"device_id INTEGER, "
-			"latitude REAL, "
-			"longitude REAL)"
-		)
-		self.cursor.execute(query_gps)
 		
 		# Create the 'tests' table.
 		query_tests = (
 			"CREATE TABLE IF NOT EXISTS tests ("
 			"ID INTEGER PRIMARY KEY AUTOINCREMENT, "
 			"device_id INTEGER, "
-			"testType TEXT, "
-			"testResult TEXT, "
-			"description TEXT, "
-			"timeStamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
+			"test_type TEXT, "
+			"test_result TEXT, "
+			"tested_with_device_id INTEGER, "
+			"time_stamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
 		)
 		self.cursor.execute(query_tests)
+		
+		# Create the 'cracked_passwords' table.
+		query_cracked_passwords = (
+			"CREATE TABLE IF NOT EXISTS cracked_passwords ("
+			"ID INTEGER PRIMARY KEY AUTOINCREMENT, "
+			"device_id INTEGER, "
+			"password TEXT, "
+			"cracked_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+		)
+		self.cursor.execute(query_cracked_passwords)
 		self.conn.commit()
 
 	def send_to_kismet_api(self, api_request: str) -> dict:
@@ -107,6 +107,12 @@ class DatabaseHandler:
 			return {}
 		url = f"http://0.0.0.0:2501/{api_request}"
 		response = self.api_session.get(url=url)
+		counter = 0
+		while response.status_code != 200 and counter < 5:
+			self.logger.warning(
+				f"API request failed with status code {response.status_code}. Retrying...")
+			counter += 1
+			response = self.api_session.get(url=url)
 		if response.status_code == 200:
 			json_data = json.loads(response.text)
 			return json_data
@@ -132,6 +138,47 @@ class DatabaseHandler:
 		Returns the active Kismet API session.
 		"""
 		return self.api_session
+	
+class DatabaseReader:
+	"""
+	Class for reading database to make reports.
+	"""
+	def __init__(self, db_file: str):
+		self.config_instance = get_config()
+		self.config = self.config_instance.CONFIG
+		self.logger = get_logger(*self.config_instance.get_logger_settings())
+		self.db_name = db_file
+		self.conn = None
+		self.cursor = None
+		self.open_db()
+
+	def open_db(self) -> None:
+		"""
+		Tries to open the database.
+		If it fails then it will create a copy of the database in /tmp and open that.
+		"""
+		try:
+			self.conn = sqlite3.connect(self.db_name)
+			self.cursor = self.conn.cursor()
+		except sqlite3.OperationalError as e:
+			self.logger.error(f"Failed to open database while making report: {e}")
+			self.logger.info("Creating a copy of the database in /tmp.")
+			import shutil
+			shutil.copy(self.db_name, "/tmp")
+			self.conn = sqlite3.connect("/tmp/" + self.db_name.split("/")[-1])
+			self.cursor = self.conn.cursor()
+
+	def get_conn(self):
+		"""
+		Returns the active SQLite database connection.
+		"""
+		return self.conn
+
+	def get_cursor(self):
+		"""
+		Returns the active SQLite cursor.
+		"""
+		return self.cursor
 
 _database_handler_instance = None
 

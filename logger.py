@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -49,7 +50,8 @@ class Logger:
 			console_level (int): Log level for the console
 		"""
 		self.logger = logging.getLogger(name)
-		self.logger.setLevel(logging.DEBUG)  # Najnižšia úroveň zachytenia
+		self.logger.setLevel(logging.DEBUG)  # Lower level to capture all messages
+		self._log_file = log_file
 
 		if not self.logger.handlers:
 			if log_file:
@@ -93,6 +95,15 @@ class Logger:
 
 	def exception(self, message: str) -> None:
 		self.logger.exception(message)
+
+	def get_file_path(self) -> str:
+		"""
+		Returns the path of the log file.
+		
+		Returns:
+			str: Path to the log file
+		"""
+		return self._log_file
 
 
 def get_logger(logger_name: str = "app", log_file: str = "logs/app.log", file_level: str = "WARNING", console_level: str = "DEBUG") -> Logger:
