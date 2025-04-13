@@ -158,10 +158,26 @@ def status():
     return jsonify(crack_status)
 
 def get_crack_status():
+    """
+    Get the current crack status.
+
+    Returns:
+        dict: The current crack status.
+    """
     return crack_status
 
 
 def get_latest_targetcap(prefix, suffix):
+    """
+    Get the latest targetcap file based on the prefix and suffix.
+
+    Parameters:
+        prefix (str): The prefix of the targetcap file.
+        suffix (str): The suffix of the targetcap file.
+
+    Returns:
+        str: The latest targetcap file path or None if not found.
+    """
     # Create a regex pattern that matches files like /tmp/targetcap-<number>.csv or .cap exactly.
     regex = re.compile(rf"^{re.escape(prefix)}-\d+\.{suffix}$")
     # First, list all files matching the glob pattern, then filter using the regex.
@@ -172,6 +188,15 @@ def get_latest_targetcap(prefix, suffix):
 
 
 def run_cracking(target_ssid, target_bssid, target_channel, method):
+    """
+    Crack the target access point using aircrack-ng modules.
+
+    Parameters:
+        target_ssid (str): The SSID of the target access point.
+        target_bssid (str): The BSSID of the target access point.
+        target_channel (str): The channel of the target access point.
+        method (str): The method to use for cracking (e.g., "aircrack").
+    """
     global crack_status, crack_stop_event
     start_time = datetime.now()
     update_status(
