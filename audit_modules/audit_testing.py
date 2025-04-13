@@ -388,29 +388,27 @@ def find_difference(lat1, lon1, lat2, lon2):
 
 def test_wpa_handshake_capture(cracking_type, handshake_capture_time, conn, cursor):
     """
-    Find all WPA/WPA2 devices (excluding WPA3, WEP, or Open),
-    attempt to capture handshake for up to handshake_capture_time minute, then crack with aircrack-ng
-    using only 2 CPU core. Skip if it's already been tried or if handshake not found.
+    Find all WPA/WPA2/WEP devices (excluding WPA3 and Open),
+    attempt to capture handshake (or IVs in case of WEP) for up to handshake_capture_time seconds,
+    then crack with aircrack-ng using the appropriate method based on encryption type.
     """
     global ALREADY_CRACKED_IDS, CURRENT_TEST
     CURRENT_TEST = TestType.CRACKING.value
 
-    # Skip WEP, WPA3, and Open networks.
+    # Skip WPA3, and Open networks.
     query = """
         SELECT ID, ssid, mac_address, encryption, ssid_channels 
         FROM devices 
-        WHERE encryption LIKE '%WPA%' 
-          AND encryption NOT LIKE '%WEP%' 
-          AND encryption NOT LIKE '%WPA3%' 
+        WHERE (encryption LIKE '%WPA%' OR encryption LIKE '%WEP%')
+          AND encryption NOT LIKE '%WPA3%'
           AND encryption NOT LIKE '%Open%'
     """
     cursor.execute(query)
-    wpa_devices = cursor.fetchall()
-    if not wpa_devices:
+    devices = cursor.fetchall()
+    if not devices:
         LOGGER.info("No WPA/WPA2 devices to crack.")
         return
 
-    # We need the interface for cracking from the config
     cracking_interface = CONFIG['interface']['cracking']
     if not cracking_interface:
         LOGGER.error(
@@ -423,24 +421,30 @@ def test_wpa_handshake_capture(cracking_type, handshake_capture_time, conn, curs
             f"Could not set monitor mode on {cracking_interface}. Aborting.")
         return
 
-    for device_row in wpa_devices:
+    for device_row in devices:
         device_id, ssid, bssid, encryption, ssid_channels = device_row
+        if encryption == "":
+            LOGGER.debug(f"Skipping device {device_id} with empty encryption.")
+            continue
         if device_id in ALREADY_CRACKED_IDS:
             continue  # Already attempted
-        ALREADY_CRACKED_IDS.add(device_id)  # Mark so we don't attempt again
+        ALREADY_CRACKED_IDS.add(device_id)  # Mark so don't attempt again
 
         LOGGER.info(
-            f"Attempting WPA handshake capture: Device ID {device_id} (BSSID {bssid}, SSID {ssid}).")
+            f"Attempting packet capture: Device ID {device_id} (BSSID {bssid}, SSID {ssid}).")
 
         channels = None
         if ssid_channels:
-            line = json.loads(ssid_channels)
-            line.sort()
-            channels = ", ".join(line)
-            LOGGER.debug(f"Channels for {ssid} is {channels}.")
+            try:
+                line = json.loads(ssid_channels)
+                line.sort()
+                channels = ", ".join(map(str, line))
+                LOGGER.debug(f"Channels for {ssid}: {channels}.")
+            except Exception as e:
+                LOGGER.error(f"Error parsing ssid_channels for {ssid}: {e}")
         
         capture_handshake_with_deauth(cracking_type, monitor_interface, device_id, bssid,
-                                      ssid, channel=channels, capture_timeout=handshake_capture_time)
+                                      ssid, encryption, channel=channels, capture_timeout=handshake_capture_time)
 
 
 def get_latest_targetcap(prefix, suffix):
@@ -454,7 +458,7 @@ def get_latest_targetcap(prefix, suffix):
     return None
 
 
-def capture_handshake_with_deauth(cracking_type, monitor_iface, device_id, bssid, ssid, capture_timeout=60, channel=None):
+def capture_handshake_with_deauth(cracking_type, monitor_iface, device_id, bssid, ssid, encryption, capture_timeout=60, channel=None):
     """
     Capture WPA/WPA2 handshake using airodump-ng and deauth attack.
     This function runs airodump-ng in the background and waits for a handshake to be captured.
@@ -465,6 +469,7 @@ def capture_handshake_with_deauth(cracking_type, monitor_iface, device_id, bssid
         device_id (int): The ID of the device being tested.
         bssid (str): The BSSID of the target access point.
         ssid (str): The SSID of the target access point.
+        encryption (str): The encryption type of the target access point.
         capture_timeout (int): The maximum time to wait for a handshake (in seconds).
         channel (int): The channel to use for airodump-ng (optional).
       
@@ -615,7 +620,14 @@ def capture_handshake_with_deauth(cracking_type, monitor_iface, device_id, bssid
         LOGGER.info("No capture file found after handshake capture.")
         return None
     
-    run_aircrack(device_id, bssid, cap_file, cracking_type)
+    if "WEP" in encryption:
+        encryption_type = "WEP"
+    elif "WPA" in encryption:
+        encryption_type = "WPA"
+    else:
+        encryption_type = ""
+        
+    run_aircrack(device_id, bssid, cap_file, cracking_type, encryption_type)
 
     # # Run run_aircrack on another thread to avoid blocking the main thread
     # # and to allow for graceful termination if needed.
@@ -624,27 +636,20 @@ def capture_handshake_with_deauth(cracking_type, monitor_iface, device_id, bssid
     # aircrack_thread.join()
     
 
-def run_aircrack(device_id, bssid, dot_cap_file, cracking_type):
+def run_aircrack(device_id, bssid, dot_cap_file, cracking_type, encryption_type):
     """
     Run aircrack-ng on the given capture file and return the cracked key.
-
-    Parameters:
-        bssid (str): The BSSID of the target access point.
-        dot_cap_file (str): The path to the capture file.
-
-    Returns:
-        str: The cracked key if found; otherwise, None.
+    Uses -a1 for WEP and -a2 for WPA/WPA2.
     """
-    aircrack_cmd = [
-        "aircrack-ng", "-a2", "-b", bssid]
+    if encryption_type == "WEP":
+        aircrack_cmd = ["aircrack-ng", "-a", "1", "-b", bssid]
+    else:
+        aircrack_cmd = ["aircrack-ng", "-a", "2", "-b", bssid]
     if cracking_type == "rockyoutxt":
-        aircrack_cmd += [
-            "-w", "/usr/share/wordlists/rockyou.txt", dot_cap_file]
+        aircrack_cmd += ["-w", "/usr/share/wordlists/rockyou.txt", dot_cap_file]
     elif cracking_type == "customPasswordList":
-        aircrack_cmd += [
-            "-w", "./config/customPasswordList.txt", dot_cap_file]
-    LOGGER.info(
-        f"Running aircrack-ng with command: {' '.join(aircrack_cmd)}")
+        aircrack_cmd += ["-w", "./config/customPasswordList.txt", dot_cap_file]
+    LOGGER.debug(f"Running aircrack-ng with command: {' '.join(aircrack_cmd)}")
     try:
         result = subprocess.run(
             aircrack_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
@@ -652,21 +657,19 @@ def run_aircrack(device_id, bssid, dot_cap_file, cracking_type):
             LOGGER.info("Aircrack-ng reported successful cracking!")
             key_match = re.search(r"KEY FOUND! \[(.*?)\]", result.stdout)
             if key_match:
-                key = key_match.group(1)                
+                key = key_match.group(1)
                 LOGGER.info(f"Cracking successful for device {bssid}! Key: {key}")
                 try:
                     with open("/var/log/cracked_ap_keys.txt", "a") as f:
                         f.write(f"({bssid}): {key}\n")
                 except Exception as e:
-                    pass
-
-                log_unique_test(device_id, TestType.CRACKING.name,
-                                    TestResult.ENC_CRACKED.name)
+                    LOGGER.error(f"Error writing to log: {e}")
+                log_unique_test(device_id, TestType.CRACKING.name, TestResult.ENC_CRACKED.name)
                 log_cracked_password(device_id, key)
             else:
-                LOGGER.info(f"Cracking attempt failed (or no key found) for device {device_id}.")
+                LOGGER.info(f"Cracking attempt failed or no key found for device {device_id}.")
         else:
-            LOGGER.info("Aircrack-ng failed to crack the handshake.")
+            LOGGER.info("Aircrack-ng failed to crack the handshake/IV capture.")
             return None
     except Exception as e:
         LOGGER.error(f"Exception while running aircrack-ng: {e}")
@@ -678,7 +681,7 @@ def set_monitor_mode(interface):
     Sets the given interface into monitor mode using airmon-ng
     and returns the new monitor interface name (e.g. wlan2mon).
     """
-    LOGGER.info(f"Enabling monitor mode on {interface}...")
+    LOGGER.debug(f"Enabling monitor mode on {interface}...")
     try:
         proc = subprocess.Popen(["airmon-ng", "start", interface],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
