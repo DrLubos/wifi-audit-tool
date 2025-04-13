@@ -8,7 +8,7 @@
         "file_level": "DEBUG"
     },
     "scan_type": 0,
-    "main_sleep": 2,
+    "main_sleep": 60,
 	"enable_terminal": false,
     "max_ap_distance": 50
 }
