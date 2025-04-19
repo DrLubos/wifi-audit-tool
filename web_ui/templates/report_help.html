@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-5">
+    <h1 class="mb-4">Report Types - User Guide</h1>
+    <p class="lead">This page describes the purpose and structure of each report type available in the application.</p>
+
+    <hr>
+    <h2>1. One Wi-Fi AP per Page (<code>one</code>)</h2>
+    <p>Displays one access point (AP) per page. Best suited for individual network analysis.</p>
+    <ul>
+        <li><strong>SSID</strong>: Name of the Wi-Fi network.</li>
+        <li><strong>MAC Address</strong>: Unique identifier of the access point.</li>
+        <li><strong>Manufacturer</strong>: Vendor derived from the MAC address.</li>
+        <li><strong>SSID Channels</strong>: Channel numbers where the AP broadcasts.</li>
+        <li><strong>Encryption</strong>: Security type (e.g., WPA2, Open).</li>
+        <li><strong>Tests</strong>: Results of performed security tests, including timestamps.</li>
+        <li><strong>Cracked Passwords</strong>: Any cracked passwords with their discovery time.</li>
+        <li><strong>Frequency Map</strong>: Visual chart of broadcast frequency usage.</li>
+        <li><strong>Location Map</strong>: Pinpointed AP location with address lookup.</li>
+    </ul>
+
+    <hr>
+    <h2>2. All Wi-Fi APs in One Document (<code>separate</code>)</h2>
+    <p>Presents all access points, each in a separate section with their own map and data.</p>
+    <p>This view allows comparative inspection of all APs scanned during an audit.</p>
+
+    <hr>
+    <h2>3. Wi-Fi APs on One Map (<code>combined</code>)</h2>
+    <p>Plots all discovered access points onto a single interactive map, with detailed info listed below.</p>
+    <p>Ideal for geographic visualization of wireless coverage and density.</p>
+
+    <hr>
+    <h2>4. CSV Export (<code>csv</code>)</h2>
+    <p>Generates a downloadable CSV report for offline storage or data processing.</p>
+    <p>Two sections are included:</p>
+    <ul>
+        <li><strong>Devices Table</strong>:
+            <ul>
+                <li><code>ID</code>: Internal record ID</li>
+                <li><code>ssid</code>: Network name</li>
+                <li><code>mac_address</code>: Hardware address</li>
+                <li><code>manufacturer</code>: Vendor</li>
+                <li><code>ssid_channels</code>: Channels used</li>
+                <li><code>frequency_map</code>: Raw signal data</li>
+                <li><code>encryption</code>: Security protocol</li>
+                <li><code>lat_avg, lon_avg</code>: Average location coordinates</li>
+            </ul>
+        </li>
+        <li><strong>Tests Table</strong>:
+            <ul>
+                <li><code>ID</code>: Test entry ID</li>
+                <li><code>device_id</code>: Reference to the related device</li>
+                <li><code>test_type</code>: Type of test performed</li>
+                <li><code>test_result</code>: Result of the test</li>
+                <li><code>tested_with_device_id</code>: Related AP, if relevant</li>
+                <li><code>time_stamp</code>: Time of execution</li>
+            </ul>
+        </li>
+    </ul>
+</div>
+{% endblock %}

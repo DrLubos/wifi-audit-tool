@@ -60,6 +60,11 @@ def report():
     return render_template("report.html", db_files=db_files, step=2, selected_db=selected_db, devices=devices, reports=report_files)
 
 
+@report_bp.route('/help', methods=['GET'])
+def report_help():
+    return render_template("report_help.html")
+
+
 @report_bp.route('/create_report', methods=['POST'])
 def create_report():
     report_type = request.form.get('report_type')
