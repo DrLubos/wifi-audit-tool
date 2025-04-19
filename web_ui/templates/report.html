@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Create Report</h1>
 
+<div style="display: flex; align-items: center; justify-content: space-evenly;">
+	<h1>Create Report</h1>
+    <a href="{{ url_for('report.report_help') }}" target="_blank">Help on Report</a>
+</div>
 {% if step == 1 %}
 {% if db_files %}
 <form method="get" action="{{ url_for('report.report') }}">

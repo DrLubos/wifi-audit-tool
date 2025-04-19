@@ -106,7 +106,8 @@
             }
 			var map = L.map('map').setView([lat, lon], 13);
 			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-			L.marker([lat, lon]).addTo(map);
+			var marker = L.marker([lat, lon]).addTo(map);
+            marker.bindPopup('<a target="_blank" href="https://www.google.com/maps?q=' + lat + ',' + lon + '">View on Google Maps</a>');
 			// Reverse geocoding with Nominatim free service.
 			$.ajax({
 				//url: 'https://nominatim.openstreetmap.org/reverse',
@@ -114,7 +115,8 @@
                 url: 'https://mazurky.eu/nominatim/reverse',
 				data: { format: 'json', lat: lat, lon: lon }, success: function (response) {
 					if (response && response.display_name) {
-						$('#address').text(response.display_name);
+                        var addressHtml = response.display_name + ' <a target="_blank" href="https://www.google.com/maps?q=' + lat + ',' + lon + '">View on Google Maps</a>';
+						$('#address').html(addressHtml);
 						$('#address-row').show();
 					}
 				}, error: function () { console.log("Reverse geocoding failed."); }

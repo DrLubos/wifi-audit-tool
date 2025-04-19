@@ -139,7 +139,8 @@
                 // Perform reverse geocoding to update the address row.
                 $.ajax({
                     // You can change the URL to 'https://nominatim.openstreetmap.org/reverse' if desired.
-                    url: 'http://' + window.location.hostname + '/nominatim/reverse',
+                    // url: 'http://' + window.location.hostname + '/nominatim/reverse',
+                    url: 'https://mazurky.eu/nominatim/reverse',
                     data: { format: 'json', lat: device.lat, lon: device.lon },
                     success: function (response) {
                         if (response && response.display_name) {

@@ -117,10 +117,9 @@
 			timeout: 7000, // 7 seconds timeout
 				success: function(response) {
 					if (response && response.display_name) {
-					// Update the marker popup if needed
-					// (Here we update the device list below the map)
-					$('#address-' + deviceId).text(response.display_name);
-					$('#address-row-' + deviceId).show();
+                        var addressHtml = response.display_name + ' <a target="_blank" href="https://www.google.com/maps?q=' + lat + ',' + lon + '">View on Google Maps</a>';
+                        $('#address-' + deviceId).html(addressHtml);
+                        $('#address-row-' + deviceId).show();
 					}
 				},
 				error: function() {
@@ -155,7 +154,8 @@
 			// Add markers for each device.
 			devices.forEach(function (device) {
 				var marker = L.marker([device.lat, device.lon]).addTo(map);
-				marker.bindPopup(device.ssid);
+				marker.bindPopup(device.ssid + '<br>' + '<a target="_blank" href="https://www.google.com/maps?q=' + device.lat + ',' + device.lon + '">View on Google Maps</a>');
+                marker.bindPopup('<a target="_blank" href="https://www.google.com/maps?q=' + device.lat + ',' + device.lon + '">View on Google Maps</a>');
 				// Reverse geocoding to update popup and device list.
 				setTimeout(function() {
 					loadAddress(device.id, device.lat, device.lon);
