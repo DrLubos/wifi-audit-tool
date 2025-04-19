@@ -90,3 +90,36 @@ legend {
 .audit-control {
 	margin-bottom: 10px;
 }
+
+/* Light Theme Overrides */
+body.light-theme {
+	background-color: #ffffff;
+	color: #000000;
+}
+
+body.light-theme a {
+	color: blue;
+    font-weight: bolder;
+}
+
+body.light-theme .flashes li {
+	background-color: #f0f0f0;
+	color: #000000;
+}
+
+body.light-theme input,
+body.light-theme select {
+	background-color: #f8f9fa;
+	color: #000000;
+	border: 1px solid var(--primary-color);
+}
+
+body.light-theme .log-container {
+	background-color: #f8f9fa;
+	color: #000000;
+}
+
+body.light-theme label,
+body.light-theme span {
+    font-weight: bolder;
+}

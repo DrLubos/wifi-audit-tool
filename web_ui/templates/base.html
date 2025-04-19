@@ -20,7 +20,9 @@
             <a href="{{ url_for('clear_reports') }}">Clear reports folder</a> |
             <a href="{{ url_for('self_restart') }}">Restart APP</a> |
 			<a href="{{ url_for('system_restart') }}">Restart system</a> |
-			<a href="{{ url_for('system_shutdown') }}">Shutdown system</a>
+			<a href="{{ url_for('system_shutdown') }}">Shutdown system</a> | 
+		    <!-- Theme toggle button -->
+		    <a href="#" id="theme-toggle" onclick="toggleTheme(); return false;">Toggle Theme</a>
 		</div>
 		<hr>
 		<nav>
@@ -71,5 +73,20 @@
 				});
 			}, 4000); // 4 seconds after the page loads
 		}
+	</script>
+	<!-- Theme Toggle Script -->
+	<script>
+		function toggleTheme() {
+			document.body.classList.toggle('light-theme');
+			let theme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+			localStorage.setItem('theme', theme);
+		}
+
+		document.addEventListener("DOMContentLoaded", function() {
+			let savedTheme = localStorage.getItem('theme');
+			if (savedTheme === 'light') {
+				document.body.classList.add('light-theme');
+			}
+		});
 	</script>
 </body>
