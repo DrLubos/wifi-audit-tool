@@ -1,6 +1,7 @@
 import sys
 import os
 import binascii
+import threading
 import time
 from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session
@@ -131,7 +132,7 @@ def config():
         except Exception as e:
             LOGGER.error(f"Error writing list files: {e}")
             flash("Error writing one or more list files.", category="error")
-
+        threading.Thread(target=restart_app).start()
         return redirect(url_for('home'))
 
     interfaces_list = get_interfaces_info()
@@ -165,7 +166,6 @@ def config():
             custom_password_list_content = f.read()
     except Exception as e:
         LOGGER.error(f"Error reading customPasswordList.txt: {e}")
-
     # Render the config page, passing in config and the file contents
     return render_template(
         'config.html',
@@ -204,6 +204,14 @@ def kismet():
 
 # ----------------------KISMET----------------------
 
+def restart_app():
+    time.sleep(1)
+    try:
+        LOGGER.info(f"{session.get('user', 'Unknown user')} - Restarting wifi_audit_tool.service")
+        os.system("sudo systemctl restart wifi_audit_tool.service")
+
+    except Exception as e:
+        LOGGER.error(f"Error during self restart: {e}")
 
 @app.route('/self_restart', methods=['GET', 'POST'])
 def self_restart():
@@ -213,20 +221,8 @@ def self_restart():
     if request.method == 'POST':
         confirmation = request.form.get('confirmation')
         if confirmation == 'yes':
-            try:
-                # Check if the service is active using systemctl
-                service_check = os.system("systemctl is-active --quiet wifi_audit_tool.service")
-                if service_check == 0:
-                    LOGGER.info(f"{session.get('user', 'Unknown user')} - Restarting wifi_audit_tool.service")
-                    os.system("sudo systemctl restart wifi_audit_tool.service")
-                else:
-                    LOGGER.info(f"{session.get('user', 'Unknown user')} - Restarting application")
-                    # Re-execute the current process to restart the app
-                    os.execl(sys.executable, sys.executable, *sys.argv)
-            except Exception as e:
-                LOGGER.error(f"Error during self restart: {e}")
-                flash("Application restart failed.", category="error")
-                return redirect(url_for('home'))
+            threading.Thread(target=restart_app).start()
+            return '', 204  # Return empty success response
         else:
             flash("Application restart canceled.", category="info")
             return redirect(url_for('home'))
