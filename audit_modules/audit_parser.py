@@ -62,11 +62,26 @@ def parse_devices():
 		LOGGER.warning("No data received from Kismet API.")
 		return
 
+	file_name = get_scan_type_file()
+	lines = []
+	list_path = "config/" + file_name
+
+	if file_name != "None":
+		try:
+			with open(list_path, 'r') as fp:
+				lines = [line.strip() for line in fp if line.strip()]
+		except FileNotFoundError:
+			LOGGER.error(f"File {list_path} not found. No filtering will be applied.")
+			lines = []
+		except Exception as e:
+			LOGGER.error(f"Error reading file {list_path}: {e}")
+			lines = []
+
 	with CONN:
 		for device in data:
 			ssid = str(device["kismet.device.base.name"])
 			# Filter out APs that should not be processed.
-			if not filter_AP_from_file(ssid):
+			if not filter_AP_from_file(ssid, file_name, lines):
 				continue
 			
 			if ssid == "WifiAudit":
@@ -130,41 +145,38 @@ def parse_devices():
 				device_id = CURSOR.lastrowid
 
 
-def filter_AP_from_file(ssid: str) -> bool:
+def filter_AP_from_file(ssid: str, file_name: str, file_lines: list) -> bool:
 	"""
 	Filter APs based on the scan type file.
 
 	Parameters:
 		ssid (str): The SSID of the AP to filter.
+		file_name (str): The name of the scan type file.
+		file_lines (list): The list of lines from the scan type file.
 
 	Returns:
 		bool: True if the AP is allowed, False otherwise.
 	"""
-	file_name = get_scan_type_file()
-	if file_name == "None":
-		return True  # No file specified, allow all APs.
-	list_path = "config/" + file_name
-
-	with open(list_path, 'r') as fp:
-		lines = [line.strip() for line in fp if line.strip()]
+	if file_name == 'None':
+		return True
 
 	if file_name == 'whiteList.txt':
 		# White list: allowed if any pattern matches.
-		for pattern in lines:
+		for pattern in file_lines:
 			if re.match(pattern, ssid):
 				return True
 		return False
 
 	elif file_name == 'blackList.txt':
 		# Black list: blocked if any pattern matches.
-		for pattern in lines:
+		for pattern in file_lines:
 			if re.match(pattern, ssid):
 				return False
 		return True
 
 	elif file_name == 'whiteBlackList.txt':
 		# White-Black list: each line should have two parts separated by "#".
-		for line in lines:
+		for line in file_lines:
 			parts = line.split("#", 1)
 			if len(parts) != 2:
 				continue  # Skip improperly formatted lines.
