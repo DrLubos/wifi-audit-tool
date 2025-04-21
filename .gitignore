@@ -13,5 +13,6 @@ kismet/
 logs/
 old/
 tests/data/
+reports/
 
 aircrack.txt
