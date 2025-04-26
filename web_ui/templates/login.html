@@ -4,10 +4,10 @@
 <form method="post" action="{{ url_for('login') }}">
     <input type="hidden" name="next" value="{{ request.args.get('next') }}">
     <label for="username">Username:</label>
-    <input type="text" id="username" name="username" value="admin" required>
+    <input type="text" id="username" name="username" value="" required>
     
     <label for="password">Password:</label>
-    <input type="password" id="password" name="password" value="admin" required>
+    <input type="password" id="password" name="password" value="" required>
     
     <label for="remember">
         <input type="checkbox" id="remember" name="remember"> Remember Me
