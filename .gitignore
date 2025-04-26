@@ -10,7 +10,6 @@ __pycache__/
 
 config/config.json
 kismet/
-logs/
 old/
 tests/data/
 reports/
