@@ -121,10 +121,18 @@ EOF
 fi
 
 # —— MODULE: Aircrack-ng
-if $AIRCRACK; then
+ if $AIRCRACK; then
     echo "Installing aircrack-ng..."
     apt install -qq -y aircrack-ng
-fi
+    echo "Downloading rockyou.txt wordlist (zip)..."
+    apt install -qq -y unzip
+    mkdir -p /usr/share/wordlists
+    if [[ ! -f /usr/share/wordlists/rockyou.txt ]]; then
+        wget -qO /tmp/rockyou.zip https://github.com/kkrypt0nn/wordlists/raw/refs/heads/main/wordlists/famous/rockyou.zip
+        unzip -p /tmp/rockyou.zip rockyou.txt > /usr/share/wordlists/rockyou.txt
+        rm /tmp/rockyou.zip
+    fi
+ fi
 
 # —— MODULE: Kismet
 if $KISMET; then
