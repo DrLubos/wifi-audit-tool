@@ -350,8 +350,8 @@ def perform_gps_test(test_type: TestType, group_by: str):
     devices = CURSOR.fetchall()
     for device in devices:
         device_id, gps_lat, gps_lon = device
-        # Log if GPS coordinates are missing.
-        if not gps_lat or not gps_lon:
+        # Skip if primary device has missing coordinates.
+        if gps_lat is None or gps_lon is None:
             continue
         # Get all devices with the same group_by value.
         query = f"SELECT ID, lat_avg, lon_avg FROM devices WHERE {group_by} = ? AND ID != ?"
@@ -360,6 +360,9 @@ def perform_gps_test(test_type: TestType, group_by: str):
         if len(device_records) > 1:
             for record in device_records:
                 other_device_id, other_gps_lat, other_gps_lon = record
+                # Skip if the other device has missing coordinates.
+                if other_gps_lat is None or other_gps_lon is None:
+                    continue
                 if test_gps_distance((gps_lat, gps_lon), (other_gps_lat, other_gps_lon)):
                     log_unique_test(
                         device_id,
