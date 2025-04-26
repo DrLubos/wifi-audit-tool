@@ -26,7 +26,7 @@ app.static_folder = "web_ui/static"
 app.secret_key = "1b13068a8084656dfe156ecc8a26d3d05"
 
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True with HTTPS in production
+app.config['SESSION_COOKIE_SECURE'] = True  # Set to True with HTTPS in production
 app.permanent_session_lifetime = timedelta(days=7)
 
 from audit_modules.audit import audit_bp
@@ -311,7 +311,23 @@ def main():
         LOGGER.debug(msg)
         time.sleep(5)
 
+
+def start_http_redirect():
+    redirect_app = Flask("redirect_http")
+
+    @redirect_app.route('/', defaults={'path': ''})
+    @redirect_app.route('/<path:path>')
+    def redirect_to_https(path):
+        print(f"https://{request.host}{request.full_path}")
+        return redirect(f"https://{request.host}{request.full_path}", code=301)
+
+    redirect_app.run(host="0.0.0.0", port=80, debug=False, threaded=True, use_reloader=False)
+
+
 if __name__ == '__main__':
     #print(app.url_map)
-    #app.run(debug=False, use_reloader=False, host="0.0.0.0", port=80)
-    app.run(debug=True, host="0.0.0.0", port=80)
+    # openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+    # Start HTTP redirect server in background
+    threading.Thread(target=start_http_redirect, daemon=True).start()
+    app.run(debug=False, use_reloader=False, host="0.0.0.0", port=443, ssl_context=("config/cert.pem", "config/key.pem"))
+    #app.run(debug=True, host="0.0.0.0", port=443, ssl_context=("config/cert.pem", "config/key.pem"))
