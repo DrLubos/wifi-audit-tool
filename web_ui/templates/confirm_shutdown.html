@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h2>Confirm System Shutdown</h2>
-<form method="post" action="{{ url_for('system_shutdown') }}">
-	<p>Are you sure you want to shut down the system?</p>
-	<button type="submit" name="confirmation" value="yes">Yes</button>
-	<button type="submit" name="confirmation" value="no">No</button>
-</form>
-{% endblock %}

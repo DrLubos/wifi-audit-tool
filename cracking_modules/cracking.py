@@ -6,7 +6,7 @@ import time
 import threading
 import subprocess
 from datetime import datetime, timedelta
-from flask import Blueprint, redirect, render_template, request, jsonify, url_for
+
 
 from config import get_config
 from logger import get_logger
@@ -14,8 +14,6 @@ from logger import get_logger
 CONFIG_INSTANCE = get_config()
 CONFIG = CONFIG_INSTANCE.CONFIG
 LOGGER = get_logger(*CONFIG_INSTANCE.get_logger_settings())
-
-cracking_bp = Blueprint('cracking', __name__, url_prefix='/cracking')
 
 # Global variables to hold status and thread
 crack_status = {"log": "", "running": False, "result": None, "scanning": False}
@@ -49,23 +47,7 @@ def set_monitor_mode(interface):
         return None
 
 
-@cracking_bp.route('/')
-def cracking():
-    from audit_modules.audit import get_audit_details
-    if get_audit_details()[0]:
-        update_status("Cracking module is disabled during audit.")
-        return redirect(url_for('home'))
-    # check if file cracked_keys.txt exists, if not create it
-    if not os.path.exists("/var/log/cracked_ap_keys.txt"):
-        with open("/var/log/cracked_ap_keys.txt", "w") as f:
-            f.write("")
-    # check if file cracked_keys.txt is empty, if not read it and send it to the template
-    with open("/var/log/cracked_ap_keys.txt", "r") as f:
-        cracked_ap = f.readlines()
-    return render_template('cracking.html', cracked_ap=cracked_ap)
 
-
-@cracking_bp.route('/scan', methods=['GET'])
 def scan():
     crack_status["log"] = ""
     crack_status["scanning"] = True
@@ -73,7 +55,7 @@ def scan():
     interface = CONFIG['interface']['cracking']
     monitor_interface = set_monitor_mode(interface)
     if monitor_interface is None:
-        return jsonify({"error": "Could not enable monitor mode"}), 500
+        return {"error": "Could not enable monitor mode"}
 
     scan_file = "/tmp/scan-01.csv"
     if os.path.exists(scan_file):
@@ -115,23 +97,15 @@ def scan():
     update_status(f"Found {len(aps)} access points.")
     aps = sorted(aps, key=lambda x: x["ssid"])
     crack_status["scanning"] = False
-    return jsonify(aps)
+    return aps
 
-
-@cracking_bp.route('/start', methods=['POST'])
-def start():
+def start(target_ssid, target_bssid, target_channel, method):
     global crack_thread, crack_status, crack_stop_event
     if crack_status["running"]:
-        return jsonify({"error": "Cracking already in progress"}), 400
-
-    data = request.get_json()
-    target_ssid = data.get("ssid")
-    target_bssid = data.get("bssid")
-    target_channel = data.get("channel")
-    method = data.get("method")
+        return {"error": "Cracking already in progress"}
 
     if not (target_ssid and target_bssid and target_channel and method):
-        return jsonify({"error": "Missing parameters"}), 400
+        return {"error": "Missing parameters"}
 
     crack_status["running"] = True
     crack_status["result"] = None
@@ -141,21 +115,18 @@ def start():
         target_ssid, target_bssid, target_channel, method))
     crack_thread.start()
 
-    return jsonify({"status": "Cracking started"})
+    return {"status": "Cracking started"}
 
 
-@cracking_bp.route('/stop', methods=['POST'])
 def stop():
     global crack_stop_event
     crack_stop_event.set()
     crack_status["log"] = ""
     update_status("Stop signal received. Terminating cracking process.")
-    return jsonify({"status": "Cracking stop initiated"})
+    return {"status": "Cracking stop initiated"}
 
-
-@cracking_bp.route('/status', methods=['GET'])
 def status():
-    return jsonify(crack_status)
+    return crack_status
 
 def get_crack_status():
     """
