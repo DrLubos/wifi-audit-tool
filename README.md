@@ -1,5 +1,8 @@
 # Wi-Fi Audit Tool
 
+## Fork
+Forked from: https://bitbucket.org/kis-fri/wifi-audit-tool.git
+
 ## Krátky popis  
 Wi-Fi Audit Tool je prenosné zariadenie určené na automatizovaný audit Wi-Fi sietí v organizáciách. Cieľom projektu je modernizovať hardvér i softvér pôvodného systému (branch: dobis-original) a doplniť nové funkcie, aby sa zvýšila úroveň zabezpečenia bezdrôtových sietí. Súčasťou systému je webové používateľské rozhranie, ktoré umožňuje jednoduchú správu a vyhodnocovanie výsledkov auditu.  
 
