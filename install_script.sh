@@ -19,23 +19,52 @@ FULL=false
 GPSD=false
 AIRCRACK=false
 KISMET=false
+KISMET_BIN=false
 APP=false
 
 usage() {
     cat <<EOF
-Usage: $0 [--full|-f] [--gpsd|-g] [--aircrack|-a] [--kismet|-k] [--app|-p]
+Usage: $0 [--full|-f] [--gpsd|-g] [--aircrack|-a] [--kismet|-k] [--kismet-bin|-b] [--app|-p]
   --full,      -f   full install (all modules)
   --gpsd,      -g   gpsd
   --aircrack,  -a   aircrack-ng
-  --kismet,    -k   kismet
+  --kismet,    -k   kismet (build from source)
+  --kismet-bin,-b   kismet (prebuilt via apt)
   --app,       -p   wifi_audit_tool application
   --help,      -h   show this help message
 EOF
     exit 1
 }
 
+configure_kismet() {
+    local CONF_DIR="$1"
+    
+    # configure confs if gpsd is running
+    if pgrep -x gpsd &>/dev/null; then
+        echo "Writing Kismet GPS site config..."
+        cat > "$CONF_DIR/kismet_site.conf" <<EOF
+gps=gpsd:host=localhost,port=2947
+EOF
+        chmod 644 "$CONF_DIR/kismet_site.conf"
+    else
+        echo "gpsd not running; skipping Kismet GPS config"
+    fi
+
+    echo "Appending Kismet logging prefs..."
+    {
+        echo "kis_log_data_packets=false"
+        echo "kis_log_duplicate_packets=false"
+    } >> "$CONF_DIR/kismet_logging.conf"
+
+    echo "Appending Kismet HTTPd credentials..."
+    {
+        echo "httpd_username=$USER_GLOBAL"
+        echo "httpd_password=$PASS_GLOBAL"
+    } >> "$CONF_DIR/kismet_httpd.conf"
+}
+
 # — parse short and long options via getopt
-PARSED=$(getopt --options fgakph --long full,gpsd,aircrack,kismet,app,help --name "$0" -- "$@")
+PARSED=$(getopt --options fgakbph --long full,gpsd,aircrack,kismet,kismet-bin,app,help --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
     usage
 fi
@@ -51,6 +80,8 @@ while true; do
             AIRCRACK=true; shift ;;
         -k|--kismet)
             KISMET=true; shift ;;
+        -b|--kismet-bin)
+            KISMET_BIN=true; shift ;;
         -p|--app)
             APP=true; shift ;;
         --)
@@ -69,12 +100,12 @@ if $FULL; then
     APP=true
 fi
 
-if ! $GPSD && ! $AIRCRACK && ! $KISMET && ! $APP; then
+if ! $GPSD && ! $AIRCRACK && ! $KISMET && ! $KISMET_BIN && ! $APP; then
     usage
 fi
 
 # — prompt for credentials
-if $KISMET || $FULL || $APP; then
+if $KISMET || $KISMET_BIN || $FULL || $APP; then
     read -p "Enter username for app user: " USER_GLOBAL
     read -s -p "Enter password for app user: " PASS_GLOBAL
     echo
@@ -167,28 +198,21 @@ if $KISMET; then
 
     usermod -aG kismet "${SUDO_USER:-$USER}"
 
-    # configure confs if gpsd is running
-    if pgrep -x gpsd &>/dev/null; then
-        echo "Writing Kismet GPS site config..."
-        cat > /usr/local/etc/kismet_site.conf <<EOF
-gps=gpsd:host=localhost,port=2947
-EOF
-        chmod 644 /usr/local/etc/kismet_site.conf
+    configure_kismet "/usr/local/etc"
+fi
 
-        echo "Appending Kismet logging prefs..."
-        {
-            echo "kis_log_data_packets=false"
-            echo "kis_log_duplicate_packets=false"
-        } >> /usr/local/etc/kismet_logging.conf
+# —— MODULE: Kismet (Prebuilt via apt)
+if $KISMET_BIN; then
+    echo "Installing prebuilt Kismet..."
+    apt install -y -qq wget lsb-release gnupg
+    wget -O - https://www.kismetwireless.net/repos/kismet-release.gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/kismet-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/kismet-archive-keyring.gpg] https://www.kismetwireless.net/repos/apt/release/$(lsb_release -cs) $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/kismet.list
+    apt update -y -qq
+    apt install -y -qq kismet
 
-        echo "Appending Kismet HTTPd credentials..."
-        {
-            echo "httpd_username=$USER_GLOBAL"
-            echo "httpd_password=$PASS_GLOBAL"
-        } >> /usr/local/etc/kismet_httpd.conf
-    else
-        echo "gpsd not running; skipping Kismet GPS config"
-    fi
+    usermod -aG kismet "${SUDO_USER:-$USER}"
+
+    configure_kismet "/etc/kismet"
 fi
 
 # —— MODULE: wifi_audit_tool Application
