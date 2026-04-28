@@ -17,17 +17,17 @@ fi
 # — initialize flags
 FULL=false
 GPSD=false
-AIRCRACK=false
+TOOLS=false
 KISMET=false
 KISMET_BIN=false
 APP=false
 
 usage() {
     cat <<EOF
-Usage: $0 [--full|-f] [--gpsd|-g] [--aircrack|-a] [--kismet|-k] [--kismet-bin|-b] [--app|-p]
+Usage: $0 [--full|-f] [--gpsd|-g] [--tools|-t] [--kismet|-k] [--kismet-bin|-b] [--app|-p]
   --full,      -f   full install (all modules)
   --gpsd,      -g   gpsd
-  --aircrack,  -a   aircrack-ng
+  --tools,     -t   tools (aircrack-ng, hcxdumptool, hcxtools)
   --kismet,    -k   kismet (build from source)
   --kismet-bin,-b   kismet (prebuilt via apt)
   --app,       -p   wifi_audit_tool application
@@ -64,7 +64,7 @@ EOF
 }
 
 # — parse short and long options via getopt
-PARSED=$(getopt --options fgakbph --long full,gpsd,aircrack,kismet,kismet-bin,app,help --name "$0" -- "$@")
+PARSED=$(getopt --options fgakbpt --long full,gpsd,tools,kismet,kismet-bin,app,help --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
     usage
 fi
@@ -76,8 +76,8 @@ while true; do
             FULL=true; shift ;;
         -g|--gpsd)
             GPSD=true; shift ;;
-        -a|--aircrack)
-            AIRCRACK=true; shift ;;
+        -t|--tools)
+            TOOLS=true; shift ;;
         -k|--kismet)
             KISMET=true; shift ;;
         -b|--kismet-bin)
@@ -95,12 +95,18 @@ done
 
 if $FULL; then
     GPSD=true
-    AIRCRACK=true
-    KISMET=true
+    TOOLS=true
     APP=true
+
+    read -p "Do you want to build latest Kismet from source? (y/N): " BUILD_KISMET
+    if [[ $BUILD_KISMET =~ ^[Yy]$ ]]; then
+        KISMET=true
+    else
+        KISMET_BIN=true
+    fi
 fi
 
-if ! $GPSD && ! $AIRCRACK && ! $KISMET && ! $KISMET_BIN && ! $APP; then
+if ! $GPSD && ! $TOOLS && ! $KISMET && ! $KISMET_BIN && ! $APP; then
     usage
 fi
 
@@ -118,33 +124,53 @@ apt upgrade -y -qq
 apt autoremove -y -qq
 
 # —— MODULE: GPSD
-if $GPSD; then
-    echo "Installing GPSD..."
-    apt install -y -qq gpsd
-
-    # auto-detect device
+if $FULL || $GPSD; then
+    # auto-detect device before installing
     if [[ -e /dev/ttyACM0 ]]; then
         DEV="/dev/ttyACM0"
     elif [[ -e /dev/ttyACM1 ]]; then
         DEV="/dev/ttyACM1"
+    elif [[ -e /dev/ttyUSB0 ]]; then
+        DEV="/dev/ttyUSB0"
     else
-        echo "No GPS device (/dev/ttyACM0 or /dev/ttyACM1) found." >&2
-        exit 1
+        DEV=""
     fi
 
-    cat > /etc/default/gpsd <<EOF
+    if [[ -z "$DEV" ]]; then
+        echo "No GPS device (/dev/ttyACM0, /dev/ttyACM1, /dev/ttyUSB0) found." >&2
+        echo "Skipping GPS installation because no antenna is connected."
+        GPSD=false
+    fi
+
+    if $GPSD; then
+        echo "Installing GPSD..."
+        apt install -y -qq gpsd
+
+        cat > /etc/default/gpsd <<EOF
 DEVICES="$DEV"
 GPSD_OPTIONS="-n -G -b"
 USBAUTO="true"
 EOF
+        echo "GPSD configured for $DEV"
+        systemctl restart gpsd || true
 
-    echo "GPSD configured for $DEV"
+        # configure Kismet if it's already installed
+        if [[ -d "/etc/kismet" ]]; then
+            echo "Writing Kismet GPS site config to /etc/kismet..."
+            echo "gps=gpsd:host=localhost,port=2947" >> /etc/kismet/kismet_site.conf
+            chmod 644 /etc/kismet/kismet_site.conf
+        elif [[ -d "/usr/local/etc" && -f "/usr/local/etc/kismet_logging.conf" ]]; then
+            echo "Writing Kismet GPS site config to /usr/local/etc..."
+            echo "gps=gpsd:host=localhost,port=2947" >> /usr/local/etc/kismet_site.conf
+            chmod 644 /usr/local/etc/kismet_site.conf
+        fi
+    fi
 fi
 
-# —— MODULE: Aircrack-ng
- if $AIRCRACK; then
-    echo "Installing aircrack-ng..."
-    apt install -qq -y aircrack-ng
+# —— MODULE: TOOLS
+ if $TOOLS; then
+    echo "Installing aircrack-ng, hcxdumptool, hcxtools..."
+    apt install -qq -y aircrack-ng hcxdumptool hcxtools
     echo "Downloading rockyou.txt wordlist (zip)..."
     apt install -qq -y unzip
     mkdir -p /usr/share/wordlists
@@ -230,11 +256,8 @@ if $APP; then
     "$APP_DIR/venv/bin/pip" install --upgrade pip
 
     # install required Python packages
-    echo "Installing Python packages..."
-    "$APP_DIR/venv/bin/pip" install aiohttp certifi colorama cryptography docutils geographiclib \
-        geopy haversine IPython jinja2 keyring numba numpy pandas Pillow psutil pytest python-nmap \
-        pytz redis requests requests-oauthlib scipy setuptools tqdm urllib3 wheel wmi yarl python-dotenv \
-       
+    echo "Installing Python packages from requirements.txt..."
+    "$APP_DIR/venv/bin/pip" install -r "$APP_DIR/requirements.txt"
 
     # write .env
     cat > "$APP_DIR/.env" <<EOF
